@@ -1,0 +1,8 @@
+{
+  "type": "https://api.spring-web.example/problems/duplicate-sku",
+  "title": "Duplicate SKU",
+  "status": 409,
+  "detail": "A product with sku SKU-500100 already exists",
+  "instance": "/api/products",
+  "sku": "SKU-500100"
+}

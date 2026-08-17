@@ -1,0 +1,10 @@
+{
+  "sku": "SKU-100200",
+  "name": "Mechanical Keyboard",
+  "description": "Compact 75% layout with hot-swappable switches",
+  "price": 129.90,
+  "stockQuantity": 42,
+  "category": "ELECTRONICS",
+  "createdAt": "2026-08-17T10:15:30Z",
+  "updatedAt": "2026-08-17T10:15:30Z"
+}

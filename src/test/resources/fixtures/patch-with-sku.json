@@ -1,0 +1,13 @@
+{
+  "type": "https://api.spring-web.example/problems/validation-failed",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "The request body failed validation. See the errors field for details.",
+  "instance": "/api/products/0198e2c5-1a2b-7c3d-8e4f-000000000001",
+  "errors": [
+    {
+      "field": "sku",
+      "message": "must not be provided in a patch request"
+    }
+  ]
+}

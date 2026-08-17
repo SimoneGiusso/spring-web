@@ -1,0 +1,29 @@
+{
+  "type": "https://api.spring-web.example/problems/validation-failed",
+  "title": "Validation failed",
+  "status": 400,
+  "detail": "The request body failed validation. See the errors field for details.",
+  "instance": "/api/products",
+  "errors": [
+    {
+      "field": "category",
+      "message": "must not be null"
+    },
+    {
+      "field": "name",
+      "message": "size must be between 1 and 120"
+    },
+    {
+      "field": "price",
+      "message": "must be greater than 0.00"
+    },
+    {
+      "field": "sku",
+      "message": "must match SKU-<6 digits>"
+    },
+    {
+      "field": "stockQuantity",
+      "message": "must be greater than or equal to 0"
+    }
+  ]
+}

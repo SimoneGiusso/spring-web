@@ -1,0 +1,10 @@
+{
+  "sku": "SKU-500100",
+  "name": "Espresso Machine",
+  "description": "Dual boiler, PID controlled",
+  "price": 799.50,
+  "stockQuantity": 3,
+  "category": "HOME",
+  "createdAt": "2026-01-15T09:00:00Z",
+  "updatedAt": "2026-08-17T10:15:30Z"
+}
