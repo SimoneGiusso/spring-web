@@ -76,7 +76,17 @@
       "Bash(mvn -B clean verify)",
       "Bash(grep -v \"^\\\\s*$\")",
       "Bash(python3 -)",
-      "Bash(javap -cp target/classes org.simonegiusso.springweb.product.Product)"
+      "Bash(javap -cp target/classes org.simonegiusso.springweb.product.Product)",
+      "Bash(mkdir -p assertion-files)",
+      "Bash(mv fixtures/espresso-machine.json            assertion-files/stored-product.json)",
+      "Bash(mv fixtures/espresso-machine-discounted.json assertion-files/patch-updated-product.json)",
+      "Bash(mv fixtures/mechanical-keyboard.json         assertion-files/post-created-product.json)",
+      "Bash(mv fixtures/product-not-found.json           assertion-files/get-product-not-found.json)",
+      "Bash(mvn -q test)",
+      "Bash(mvn test *)",
+      "Bash(xargs cat)",
+      "WebFetch(domain:docs.jboss.org)",
+      "WebFetch(domain:docs.hibernate.org)"
     ]
   }
 }

@@ -1,8 +1,0 @@
-{
-  "type": "https://api.spring-web.example/problems/product-not-found",
-  "title": "Product not found",
-  "status": 404,
-  "detail": "No product exists with id ${id}",
-  "instance": "/api/products/${id}",
-  "productId": "${id}"
-}

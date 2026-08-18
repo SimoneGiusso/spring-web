@@ -1,5 +1,6 @@
 package org.simonegiusso.springweb.product;
 
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.function.Consumer;
 import org.springframework.stereotype.Service;
@@ -15,23 +16,9 @@ public class ProductService {
         this.products = products;
     }
 
-    public Product findById(UUID id) {
-        return products.findById(id).orElseThrow(() -> new ProductNotFoundException(id));
-    }
-
     @Transactional
     public Product create(ProductDTO request) {
-        if (products.existsBySku(request.sku())) {
-            throw new DuplicateSkuException(request.sku());
-        }
-        return products.save(
-            Product.create(
-                request.sku(),
-                request.name(),
-                request.description(),
-                request.price(),
-                request.stockQuantity(),
-                request.category()));
+        return products.save(request.toProduct());
     }
 
     @Transactional
@@ -43,6 +30,10 @@ public class ProductService {
         applyIfPresent(request.stockQuantity(), product::setStockQuantity);
         applyIfPresent(request.category(), product::setCategory);
         return product;
+    }
+
+    Product findById(UUID id) {
+        return products.findById(id).orElseThrow(() -> new NoSuchElementException("No product exists with id " + id));
     }
 
     private static <T> void applyIfPresent(T value, Consumer<T> update) {

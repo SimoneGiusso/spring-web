@@ -1,4 +1,4 @@
-package org.simonegiusso.springweb.web;
+package org.simonegiusso.springweb.config;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
@@ -7,9 +7,8 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 import java.net.URI;
 import java.util.Comparator;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.stream.Stream;
-import org.simonegiusso.springweb.product.DuplicateSkuException;
-import org.simonegiusso.springweb.product.ProductNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -26,32 +25,20 @@ import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
-class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
+class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(WebGlobalExceptionHandler.class);
 
     private static final String PROBLEM_BASE_URI = "https://api.spring-web.example/problems/";
 
-    private static final URI PRODUCT_NOT_FOUND = problemType("product-not-found");
-    private static final URI DUPLICATE_SKU = problemType("duplicate-sku");
+    private static final URI RESOURCE_NOT_FOUND = problemType("resource-not-found");
     private static final URI RESOURCE_CONFLICT = problemType("resource-conflict");
     private static final URI VALIDATION_FAILED = problemType("validation-failed");
     private static final URI INTERNAL_ERROR = problemType("internal-error");
 
-    @ExceptionHandler(ProductNotFoundException.class)
-    ProblemDetail handleProductNotFound(ProductNotFoundException exception) {
-        ProblemDetail problem =
-            problem(NOT_FOUND, PRODUCT_NOT_FOUND, "Product not found", exception.getMessage());
-        problem.setProperty("productId", exception.getProductId());
-        return problem;
-    }
-
-    @ExceptionHandler(DuplicateSkuException.class)
-    ProblemDetail handleDuplicateSku(DuplicateSkuException exception) {
-        ProblemDetail problem =
-            problem(CONFLICT, DUPLICATE_SKU, "Duplicate SKU", exception.getMessage());
-        problem.setProperty("sku", exception.getSku());
-        return problem;
+    @ExceptionHandler(NoSuchElementException.class)
+    ProblemDetail handleNotFound(NoSuchElementException exception) {
+        return problem(NOT_FOUND, RESOURCE_NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

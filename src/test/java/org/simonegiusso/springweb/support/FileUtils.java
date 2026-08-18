@@ -7,18 +7,13 @@ import java.io.UncheckedIOException;
 import java.util.Map;
 import org.springframework.core.io.ClassPathResource;
 
-public final class JsonFixture {
+enum FileUtils {
+    ;
 
-    private static final String FIXTURE_ROOT = "fixtures/";
+    private static final String ASSERTION_FILES_ROOT = "assertion-files/";
 
-    private JsonFixture() {}
-
-    public static String load(String fileName) {
-        return load(fileName, Map.of());
-    }
-
-    public static String load(String fileName, Map<String, ?> placeholders) {
-        String json = read(FIXTURE_ROOT + fileName);
+    static String load(String fileName, Map<String, ?> placeholders) {
+        String json = read(ASSERTION_FILES_ROOT + fileName);
         for (Map.Entry<String, ?> placeholder : placeholders.entrySet()) {
             json = json.replace("${" + placeholder.getKey() + "}", String.valueOf(placeholder.getValue()));
         }

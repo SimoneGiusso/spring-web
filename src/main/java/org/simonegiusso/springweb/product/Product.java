@@ -68,7 +68,7 @@ public class Product {
     @Version
     private long version;
 
-    private Product(
+    Product(
         String sku,
         String name,
         String description,
@@ -81,15 +81,5 @@ public class Product {
         this.price = price;
         this.stockQuantity = stockQuantity;
         this.category = category;
-    }
-
-    static Product create(
-        String sku,
-        String name,
-        String description,
-        BigDecimal price,
-        int stockQuantity,
-        ProductCategory category) {
-        return new Product(sku, name, description, price, stockQuantity, category);
     }
 }

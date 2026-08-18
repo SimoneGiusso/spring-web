@@ -3,11 +3,15 @@
   "title": "Validation failed",
   "status": 400,
   "detail": "The request body failed validation. See the errors field for details.",
-  "instance": "/api/products",
+  "instance": "${basePath}",
   "errors": [
     {
       "field": "category",
       "message": "must not be null"
+    },
+    {
+      "field": "createdAt",
+      "message": "is read-only and must not be provided"
     },
     {
       "field": "name",

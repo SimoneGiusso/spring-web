@@ -1,0 +1,7 @@
+{
+  "type": "https://api.spring-web.example/problems/resource-not-found",
+  "title": "Resource not found",
+  "status": 404,
+  "detail": "No product exists with id ${id}",
+  "instance": "${basePath}/${id}"
+}

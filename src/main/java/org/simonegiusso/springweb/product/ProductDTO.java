@@ -58,4 +58,8 @@ public record ProductDTO(
             product.getCreatedAt(),
             product.getUpdatedAt());
     }
+
+    Product toProduct() {
+        return new Product(sku, name, description, price, stockQuantity, category);
+    }
 }

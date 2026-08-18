@@ -18,8 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
-@RequestMapping(path = "/api/products", produces = APPLICATION_JSON_VALUE)
+@RequestMapping(path = ProductController.BASE_PATH, produces = APPLICATION_JSON_VALUE)
 class ProductController {
+
+    static final String BASE_PATH = "/api/products";
 
     private final ProductService products;
 
@@ -37,7 +39,7 @@ class ProductController {
         @Validated(OnCreate.class) @RequestBody ProductDTO request,
         UriComponentsBuilder uriBuilder) {
         Product created = products.create(request);
-        URI location = uriBuilder.path("/api/products/{id}").buildAndExpand(created.getId()).toUri();
+        URI location = uriBuilder.path(BASE_PATH + "/{id}").buildAndExpand(created.getId()).toUri();
         return ResponseEntity.created(location).body(ProductDTO.from(created));
     }
 

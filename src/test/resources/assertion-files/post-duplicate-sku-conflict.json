@@ -1,0 +1,7 @@
+{
+  "type": "https://api.spring-web.example/problems/resource-conflict",
+  "title": "Conflicting resource state",
+  "status": 409,
+  "detail": "The request conflicts with the current state of the resource.",
+  "instance": "${basePath}"
+}
