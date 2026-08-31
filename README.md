@@ -77,10 +77,19 @@ are rejected by validation if a client sends them.
 enables auditing with a `DateTimeProvider` that reads a `Clock` bean instead of the system clock.
 That single indirection is what lets tests pin time to a fixed instant.
 
+## Revision history with Envers
+
+[Hibernate Envers](https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html#envers).
+Where the fields above record *when* a product last changed, Envers records *what* it looked like at
+every change. A single `@Audited` on
+[`Product`](src/main/java/org/simonegiusso/springweb/product/Product.java) is the whole wiring: Envers
+hooks Hibernate's flush events and writes one `revinfo` row per transaction plus one `products_aud`
+row holding the full state of the product at that revision.
+
 ## Schema migrations
 
 [Flyway](https://docs.spring.io/spring-boot/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway)
-owns the schema — [`V1__create_products_table.sql`](src/main/resources/db/migration/V1__create_products_table.sql).
+owns the schema.
 [`application.yml`](src/main/resources/application.yml) sets `ddl-auto: validate`, so Hibernate
 checks its mapping against the migrated schema and never modifies it.
 
@@ -113,7 +122,7 @@ drives the API over HTTP against a real PostgreSQL. The supporting pieces live i
 - **[`@TestBean`](https://docs.spring.io/spring-framework/reference/testing/annotations/integration-spring/annotation-testbean.html)**
   replaces the `Clock` bean with a fixed one, making audit timestamps exactly assertable.
 - **[`@Sql`](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/executing-sql.html)**
-  runs [`truncate-products.sql`](src/test/resources/sql-scripts/truncate-products.sql) before each
+  runs [`truncate-tables.sql`](src/test/resources/sql-scripts/truncate-tables.sql) before each
   test method. Note it executes *before* `@BeforeEach`, so per-test seeding must not live there.
 - **[`JdbcClient`](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html#jdbc-JdbcClient)**
   seeds rows in [`ProductTestData`](src/test/java/org/simonegiusso/springweb/support/ProductTestData.java).

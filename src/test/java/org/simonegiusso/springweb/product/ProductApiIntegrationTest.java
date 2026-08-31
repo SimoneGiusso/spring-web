@@ -1,6 +1,8 @@
 package org.simonegiusso.springweb.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hibernate.envers.RevisionType.ADD;
+import static org.hibernate.envers.RevisionType.MOD;
 import static org.simonegiusso.springweb.product.ProductCategory.ELECTRONICS;
 import static org.simonegiusso.springweb.product.ProductController.BASE_PATH;
 import static org.simonegiusso.springweb.support.ProductTestData.ESPRESSO_MACHINE_ID;
@@ -83,6 +85,7 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(stored.getCreatedAt()).isEqualTo(FIXED_NOW);
         assertThat(stored.getUpdatedAt()).isEqualTo(FIXED_NOW);
         assertThat(stored.getVersion()).isZero();
+        assertThat(products.revisionTypes()).containsExactly(ADD);
     }
 
     @Test
@@ -131,6 +134,7 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
             .expectBody().json(assertionFile("post-duplicate-sku-conflict.json"), STRICT);
 
         assertThat(products.countProducts()).isOne();
+        assertThat(products.revisionTypes()).isEmpty();
     }
 
     @Test
@@ -157,6 +161,7 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(stored.getStockQuantity()).isEqualTo(3);
         assertThat(stored.getUpdatedAt()).isEqualTo(FIXED_NOW);
         assertThat(stored.getVersion()).isOne();
+        assertThat(products.revisionTypes()).containsExactly(MOD);
     }
 
     @Test
@@ -182,6 +187,7 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(stored.getSku()).isEqualTo("SKU-500100");
         assertThat(stored.getPrice()).isEqualByComparingTo("899.00");
         assertThat(stored.getVersion()).isZero();
+        assertThat(products.revisionTypes()).isEmpty();
     }
 
     @Test
@@ -200,5 +206,6 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
         Product stored = products.findBy(ESPRESSO_MACHINE_ID);
         assertThat(stored.getUpdatedAt()).isEqualTo(SEEDED_AT);
         assertThat(stored.getVersion()).isZero();
+        assertThat(products.revisionTypes()).isEmpty();
     }
 }

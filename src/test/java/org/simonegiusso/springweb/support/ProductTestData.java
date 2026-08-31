@@ -5,6 +5,7 @@ import static java.time.ZoneOffset.UTC;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.envers.RevisionType;
 import org.simonegiusso.springweb.product.Product;
 import org.simonegiusso.springweb.product.ProductRepository;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -51,5 +52,15 @@ public class ProductTestData {
 
     public long countProducts() {
         return repository.count();
+    }
+
+    public List<RevisionType> revisionTypes() {
+        return database
+            .sql("SELECT revtype FROM products_aud ORDER BY rev")
+            .query(Byte.class)
+            .list()
+            .stream()
+            .map(RevisionType::fromRepresentation)
+            .toList();
     }
 }

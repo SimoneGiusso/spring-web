@@ -86,7 +86,21 @@
       "Bash(mvn test *)",
       "Bash(xargs cat)",
       "WebFetch(domain:docs.jboss.org)",
-      "WebFetch(domain:docs.hibernate.org)"
+      "WebFetch(domain:docs.hibernate.org)",
+      "Read(//Users/simonegiusso/.m2/repository/org/javers/**)",
+      "Bash(curl -s \"https://search.maven.org/solrsearch/select?q=g:org.javers+AND+a:javers-spring-boot-starter-sql&core=gav&rows=10&wt=json\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(x['v'], x['timestamp']\\) for x in d['response']['docs']]\")",
+      "Bash(curl -s \"https://repo1.maven.org/maven2/org/javers/javers-spring-boot-starter-sql/maven-metadata.xml\")",
+      "Bash(curl *)",
+      "Bash(mvn -q -o dependency:resolve)",
+      "Bash(mvn -q dependency:resolve)",
+      "Bash(unzip -p ~/.m2/repository/org/javers/javers-spring-boot-starter-sql/7.11.8/javers-spring-boot-starter-sql-7.11.8.jar META-INF/spring-configuration-metadata.json)",
+      "Bash(python3 -c \"import sys,json;d=json.load\\(sys.stdin\\);[print\\(p['name'],'=',p.get\\('defaultValue'\\)\\) for p in d.get\\('properties',[]\\)]\")",
+      "Bash(unzip -p ~/.m2/repository/org/javers/javers-spring-boot-starter-sql/7.11.8/javers-spring-boot-starter-sql-7.11.8.jar META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports)",
+      "Bash(mvn -o -q test -Dtest=JaversSchemaDumpTest -DfailIfNoTests=false)",
+      "Bash(mvn -o -q test -Dtest=EnversSchemaDumpTest -DfailIfNoTests=false)",
+      "Bash(mvn -o test)",
+      "Bash(git --no-pager diff -- pom.xml src/main src/test)"
     ]
   }
 }

@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.client.RestTestClient;
     webEnvironment = RANDOM_PORT,
     properties = "spring.docker.compose.enabled=false")
 @Import({TestcontainersConfiguration.class, ProductTestData.class})
-@Sql("/sql-scripts/truncate-products.sql")
+@Sql("/sql-scripts/truncate-tables.sql")
 public abstract class AbstractIntegrationTest {
 
     protected static final Instant FIXED_NOW = Instant.parse("2026-08-17T10:15:30Z");
