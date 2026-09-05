@@ -103,6 +103,22 @@
     <build>
         <plugins>
             <!--
+              Surefire only matches *Test/*Tests by default; *IT is Failsafe's pattern. Widening the
+              includes keeps the short suffix without moving the suite to the verify phase.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                        <include>**/*IT.java</include>
+                    </includes>
+                </configuration>
+            </plugin>
+
+            <!--
               Declaring annotationProcessorPaths replaces classpath discovery, so Lombok has to be
               listed too. lombok-mapstruct-binding makes MapStruct wait for Lombok's generated
               accessors instead of mapping against a type that has none yet.

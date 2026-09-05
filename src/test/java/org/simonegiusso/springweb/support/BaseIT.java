@@ -14,7 +14,7 @@ import org.springframework.test.context.jdbc.Sql;
 @SpringBootTest(webEnvironment = RANDOM_PORT, properties = "spring.docker.compose.enabled=false")
 @Import(TestcontainersConfiguration.class)
 @Sql("/sql-scripts/truncate-tables.sql")
-public abstract class BaseIntegrationTest {
+public abstract class BaseIT {
 
     protected static final Instant FIXED_NOW = Instant.parse("2026-08-17T10:15:30Z");
 

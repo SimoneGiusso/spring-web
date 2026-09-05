@@ -98,8 +98,8 @@ not use:
 
 | | |
 |---|---|
-| `BaseIntegrationTest` | context, container, clean schema per method, pinned clock |
-| `BaseApiIntegrationTest` | adds `RestTestClient`s and assertion-file resolution |
+| `BaseIT` | context, container, clean schema per method, pinned clock |
+| `BaseApiIT` | adds `RestTestClient`s and assertion-file resolution |
 
 - **`RestTestClient`** (new in Spring Framework 7) issues requests; `clientFor(user)` pins `X-User`
   as a default header, so a test reads as `alice.get()` / `bob.patch()` and tenant isolation is

@@ -11,12 +11,12 @@ import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.simonegiusso.springweb.support.BaseIntegrationTest;
+import org.simonegiusso.springweb.support.BaseIT;
 import org.simonegiusso.springweb.support.ProductTestFactory;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
-class ProductCountLoggerIntegrationTest extends BaseIntegrationTest {
+class ProductCountLoggerIT extends BaseIT {
 
     @Autowired
     private ProductTestFactory testData;

@@ -8,7 +8,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-public abstract class BaseApiIntegrationTest extends BaseIntegrationTest {
+public abstract class BaseApiIT extends BaseIT {
 
     @LocalServerPort
     protected int port;

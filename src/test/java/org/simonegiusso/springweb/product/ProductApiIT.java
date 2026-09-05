@@ -19,13 +19,13 @@ import java.net.URI;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.simonegiusso.springweb.support.BaseApiIntegrationTest;
+import org.simonegiusso.springweb.support.BaseApiIT;
 import org.simonegiusso.springweb.support.ProductTestFactory;
 import org.simonegiusso.springweb.support.TestProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-class ProductApiIntegrationTest extends BaseApiIntegrationTest {
+class ProductApiIT extends BaseApiIT {
 
     private static final UUID UNKNOWN_ID = UUID.fromString("00000000-0000-7000-8000-000000000000");
 
