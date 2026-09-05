@@ -1,137 +1,137 @@
 # spring-web
 
-A small product-catalog REST API used as a working reference for the Spring features below.
-**Spring Boot 4.1** · **Spring Framework 7** · Java 21 · PostgreSQL 17.
+A template for a **multi-tenant REST API** on Spring Boot. The domain — a product catalog — is
+deliberately thin. The point is everything around it: each row belongs to a user, and that isolation
+is enforced by the persistence layer instead of by checks scattered through application code.
 
-Each section names the feature, says how it is wired here, and links to the file that uses it and to
-the reference documentation.
+**Java 21 · Spring Boot 4.1 · Spring Framework 7 · Hibernate 7.4 · PostgreSQL 17**
 
----
+## Libraries
 
-## Web layer
+| Library | Used for |
+|---|---|
+| Spring Web MVC | annotated REST controllers |
+| Spring Data JPA · Hibernate ORM | persistence, and the multi-tenancy discriminator |
+| Hibernate Envers | a full copy of every row at every change |
+| Hibernate Validator | request-body constraints, grouped per endpoint |
+| MapStruct | entity ⇄ DTO conversions, generated at compile time |
+| Lombok | accessors, constructors, loggers |
+| Flyway | schema migrations, versioned and checksummed |
+| Testcontainers | a throw-away PostgreSQL for the test suite |
+| Actuator | health and info endpoints |
 
-[Spring MVC](https://docs.spring.io/spring-framework/reference/web/webmvc.html) annotated
-controllers. [`ProductController`](src/main/java/org/simonegiusso/springweb/product/ProductController.java)
-declares `@RestController` with a class-level `@RequestMapping` fixing the base path and the produced
-media type, so each handler only declares what differs. `ResponseEntity.created(...)` builds the
-`201` response with a `Location` header from an injected `UriComponentsBuilder`, which resolves
-against the current request rather than a hard-coded host.
+## How it is built
 
-## Request validation with groups
+### Multi-tenancy
 
-[Bean Validation](https://docs.spring.io/spring-framework/reference/core/validation/beanvalidation.html)
-applied to `@RequestBody` arguments — see
-[method validation in MVC](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-controller/ann-validation.html).
+Discriminator-based multi-tenancy, driven entirely by Hibernate:
 
-One [`ProductDTO`](src/main/java/org/simonegiusso/springweb/product/ProductDTO.java) serves create,
-patch and response, with the rules that differ per endpoint tagged by validation group. The
-controller selects the group with `@Validated(OnCreate.class)` / `@Validated(OnPatch.class)`; plain
-`@Valid` cannot carry groups.
+- **`@TenantId`** on the entity's `owner` field. Hibernate assigns it on insert, appends `owner = ?`
+  to every select, update and delete — including `find()` by primary key — and refuses to let the
+  application change it. `ProductService` and `ProductRepository` contain no tenancy code at all: a
+  foreign id simply comes back empty and surfaces as `404`, never `403`, which would confirm the row
+  exists.
+- **`CurrentTenantIdentifierResolver`** answers "which tenant is this session". Spring Boot has no
+  property for it, so the bean registers *itself* by also implementing `HibernatePropertiesCustomizer`.
+- **A `@RequestScope` bean** holds the caller, built from the injected `HttpServletRequest`. One
+  instance per request means nothing has to be unbound afterwards — the scope ends when the request
+  does.
+- **A `HandlerInterceptor`** validates the `X-User` header and rejects from `preHandle`, which keeps
+  the failure inside Spring MVC so it renders as a problem document like every other error. It is
+  registered on `/**`, so a new controller is tenant-scoped by default.
+- **No request bound ⇒ system.** The resolver asks `RequestContextHolder` whether a request exists;
+  when none does, the work is a scheduled task, a message listener or a test, and it resolves to a
+  system tenant that `isRoot` reports as Hibernate's **root tenant** — filter off, every owner
+  visible. Background code keeps the ordinary repositories and never mentions tenants.
+- **`admin` is the same mechanism pointed at a person**: also reported as root, so the plain
+  `GET /api/products/{id}` returns any owner's product with no branch in the controller.
 
-The load-bearing detail is that both groups **extend `Default`**
-([`OnCreate`](src/main/java/org/simonegiusso/springweb/product/validation/OnCreate.java),
-[`OnPatch`](src/main/java/org/simonegiusso/springweb/product/validation/OnPatch.java)). Group
-inheritance means validating `OnPatch` also evaluates every untagged constraint, so value rules are
-declared once and enforced on both endpoints while only presence rules stay group-specific. Without
-it a `PATCH` would skip every value rule.
+`X-User` stands in for authentication, which is not implemented. Any caller can claim any identity,
+`admin` included.
 
-## Error responses
+### API and error handling
 
-[RFC 9457 Problem Details](https://www.rfc-editor.org/rfc/rfc9457.html) via Spring's
-[`ProblemDetail` support](https://docs.spring.io/spring-framework/reference/web/webmvc/mvc-ann-rest-exceptions.html).
+Class-level `@RequestMapping` fixes the base path and media type. `POST` answers `201` with a
+`Location` built from an injected `UriComponentsBuilder` and **no body** — clients follow the link.
 
-[`WebGlobalExceptionHandler`](src/main/java/org/simonegiusso/springweb/config/WebGlobalExceptionHandler.java)
-is a `@RestControllerAdvice` that **extends `ResponseEntityExceptionHandler`**. The base class
-already renders everything Spring MVC raises before a controller is reached — unreadable JSON, wrong
-media type, unknown route, non-UUID path variable — as `application/problem+json`. The advice adds
-the remaining cases without defining custom exception types: `NoSuchElementException` → 404,
-`DataIntegrityViolationException` → 409, anything else → 500.
+Errors are [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457.html) problem documents. A
+`@RestControllerAdvice` **extends `ResponseEntityExceptionHandler`**, so everything Spring MVC raises
+before a controller is reached — unreadable JSON, wrong media type, unknown route, non-UUID path
+variable — is already rendered as `application/problem+json`. The advice adds the rest, and overrides
+`handleMethodArgumentNotValid` to attach a sorted machine-readable `errors` array.
 
-Overriding `handleMethodArgumentNotValid` attaches a sorted, machine-readable `errors` array to the
-problem document, so every violation is reported in one response.
+### Validation
 
-## Persistence
+One DTO serves create, patch and response, with per-endpoint rules tagged by **validation group**.
+Both groups extend `Default`, so value rules are declared once and enforced on both endpoints while
+only presence rules stay group-specific.
 
-[Spring Data JPA repositories](https://docs.spring.io/spring-data/jpa/reference/repositories/core-concepts.html).
-[`ProductRepository`](src/main/java/org/simonegiusso/springweb/product/ProductRepository.java) is a
-bare `JpaRepository` — no query methods are needed.
+### Mapping
 
-[`ProductService`](src/main/java/org/simonegiusso/springweb/product/ProductService.java) is
-`@Transactional(readOnly = true)` at class level with writes opting in per method. The patch method
-mutates the managed entity and returns it without calling `save`: Hibernate's dirty checking flushes
-at commit. Duplicate `sku` is left to the database's unique constraint, which Spring's exception
-translation surfaces as `DataIntegrityViolationException` — no check-then-act race.
+MapStruct generates the conversions from two method signatures, leaving the DTO as pure wire
+contract. Declaring `annotationProcessorPaths` disables classpath discovery, so Lombok is listed
+there too and `lombok-mapstruct-binding` makes MapStruct run after it. `toEntity` explicitly ignores
+the id, version, timestamps and owner: the entity's `@AllArgsConstructor` would otherwise let a
+request body assign them.
 
-[`Product`](src/main/java/org/simonegiusso/springweb/product/Product.java) uses `@Version` for
-optimistic locking and Hibernate's
-[`@UuidGenerator`](https://docs.hibernate.org/orm/7.0/javadocs/org/hibernate/annotations/UuidGenerator.html)
-with `VERSION_7`, so identifiers are time-ordered and index-friendly.
+### Auditing and history
 
-## Auditing with an injectable clock
+`@CreatedDate` / `@LastModifiedDate` are filled by an entity listener whose `DateTimeProvider` reads
+an injectable **`Clock` bean** rather than the system clock — the single indirection that lets tests
+pin time. Envers adds the other axis: one `@Audited` writes a revision row holding the whole product
+at every change.
 
-[Spring Data auditing](https://docs.spring.io/spring-data/jpa/reference/auditing.html). `createdAt`
-and `updatedAt` are `@CreatedDate` / `@LastModifiedDate` fields populated by an entity listener, and
-are rejected by validation if a client sends them.
+### Schema and scheduling
 
-[`PersistenceConfiguration`](src/main/java/org/simonegiusso/springweb/config/PersistenceConfiguration.java)
-enables auditing with a `DateTimeProvider` that reads a `Clock` bean instead of the system clock.
-That single indirection is what lets tests pin time to a fixed instant.
+Flyway owns the schema and `ddl-auto: validate` makes Hibernate check its mapping against it without
+ever modifying it. `@Scheduled` demonstrates the system path: a task that reads across every owner
+while containing no tenancy code.
 
-## Revision history with Envers
-
-[Hibernate Envers](https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html#envers).
-Where the fields above record *when* a product last changed, Envers records *what* it looked like at
-every change. A single `@Audited` on
-[`Product`](src/main/java/org/simonegiusso/springweb/product/Product.java) is the whole wiring: Envers
-hooks Hibernate's flush events and writes one `revinfo` row per transaction plus one `products_aud`
-row holding the full state of the product at that revision.
-
-## Schema migrations
-
-[Flyway](https://docs.spring.io/spring-boot/how-to/data-initialization.html#howto.data-initialization.migration-tool.flyway)
-owns the schema.
-[`application.yml`](src/main/resources/application.yml) sets `ddl-auto: validate`, so Hibernate
-checks its mapping against the migrated schema and never modifies it.
-
-## Runtime configuration
-
-- [Docker Compose support](https://docs.spring.io/spring-boot/reference/features/dev-services.html#features.dev-services.docker-compose):
-  `spring-boot-docker-compose` starts [`compose.yaml`](compose.yaml) before the app and stops it on
-  shutdown, so `mvn spring-boot:run` needs no manual database setup.
-- [Virtual threads](https://docs.spring.io/spring-boot/reference/features/spring-application.html#features.spring-application.virtual-threads):
-  `spring.threads.virtual.enabled` puts request handling on virtual threads.
-- [Actuator](https://docs.spring.io/spring-boot/reference/actuator/endpoints.html): only `health` and
-  `info` are exposed.
+Request handling runs on **virtual threads**, and `spring-boot-docker-compose` starts the database
+before the app.
 
 ## Testing
 
-[`ProductApiIntegrationTest`](src/test/java/org/simonegiusso/springweb/product/ProductApiIntegrationTest.java)
-drives the API over HTTP against a real PostgreSQL. The supporting pieces live in
-[`AbstractIntegrationTest`](src/test/java/org/simonegiusso/springweb/support/AbstractIntegrationTest.java):
+Integration tests only, over HTTP against a real PostgreSQL started by Testcontainers via
+`@ServiceConnection`. The base classes split by what a test needs, so nothing inherits what it does
+not use:
 
-- **[`@SpringBootTest(webEnvironment = RANDOM_PORT)`](https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html)**
-  boots the full application on a random port, injected with `@LocalServerPort`.
-- **[`RestTestClient`](https://docs.spring.io/spring-framework/reference/testing/resttestclient.html)**
-  (new in Spring Framework 7) issues the requests and carries the fluent expectations. Response
-  bodies are compared `STRICT` against files in
-  [`assertion-files/`](src/test/resources/assertion-files), loaded by
-  [`FileUtils`](src/test/java/org/simonegiusso/springweb/support/FileUtils.java).
-- **[Testcontainers with `@ServiceConnection`](https://docs.spring.io/spring-boot/reference/testing/testcontainers.html)**
-  starts PostgreSQL and contributes the datasource properties automatically —
-  [`TestcontainersConfiguration`](src/test/java/org/simonegiusso/springweb/TestcontainersConfiguration.java).
-- **[`@TestBean`](https://docs.spring.io/spring-framework/reference/testing/annotations/integration-spring/annotation-testbean.html)**
-  replaces the `Clock` bean with a fixed one, making audit timestamps exactly assertable.
-- **[`@Sql`](https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/executing-sql.html)**
-  runs [`truncate-tables.sql`](src/test/resources/sql-scripts/truncate-tables.sql) before each
-  test method. Note it executes *before* `@BeforeEach`, so per-test seeding must not live there.
-- **[`JdbcClient`](https://docs.spring.io/spring-framework/reference/data-access/jdbc/core.html#jdbc-JdbcClient)**
-  seeds rows in [`ProductTestData`](src/test/java/org/simonegiusso/springweb/support/ProductTestData.java).
-  Seeding cannot go through the repository: auditing would overwrite the timestamps and the id is
-  generated on save, so a fixture with a known id and a past `createdAt` is only reachable via SQL.
+| | |
+|---|---|
+| `BaseIntegrationTest` | context, container, clean schema per method, pinned clock |
+| `BaseApiIntegrationTest` | adds `RestTestClient`s and assertion-file resolution |
+
+- **`RestTestClient`** (new in Spring Framework 7) issues requests; `clientFor(user)` pins `X-User`
+  as a default header, so a test reads as `alice.get()` / `bob.patch()` and tenant isolation is
+  asserted by *who* makes the call.
+- **`@TestBean`** swaps the `Clock` for a fixed one, making audit timestamps exactly assertable.
+- **`@Sql`** truncates before each method. It runs *before* `@BeforeEach`, so per-test seeding cannot
+  live there.
+- Fixtures are split by direction: a factory writes rows with SQL — auditing would overwrite
+  timestamps and ids are generated on save, so a known id with a past `createdAt` is only reachable
+  that way — and a separate read-only class queries them back.
+- Response bodies are compared `STRICT` against files in `src/test/resources/assertion-files`.
+
+Test fixtures are plain `@Component`s: test classes sit under the same base package as
+`@SpringBootApplication` and `target/test-classes` is on the classpath while testing, so the
+application's own component scan finds them. Only `TestcontainersConfiguration` is imported, because
+Boot deliberately holds `@TestConfiguration` back from scanning.
+
+## Running
+
+Requires **Java 21** and a running **Docker** daemon.
 
 ```bash
 mvn test              # integration tests against a throw-away PostgreSQL container
 mvn spring-boot:run   # app on :8080, health at /actuator/health
 ```
 
-Requires Java 21 and a running Docker daemon.
+```bash
+# every request identifies its user; products are visible only to their owner
+curl -X POST localhost:8080/api/products -H 'Content-Type: application/json' -H 'X-User: alice' \
+  -d '{"sku":"SKU-000001","name":"Widget","price":10.00,"stockQuantity":5,"category":"HOME"}'
+
+curl localhost:8080/api/products/{id} -H 'X-User: alice'   # 200
+curl localhost:8080/api/products/{id} -H 'X-User: bob'     # 404 — not bob's
+curl localhost:8080/api/products/{id} -H 'X-User: admin'   # 200 — admin sees every owner
+```

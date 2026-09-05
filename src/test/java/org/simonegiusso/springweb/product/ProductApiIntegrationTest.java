@@ -3,39 +3,59 @@ package org.simonegiusso.springweb.product;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hibernate.envers.RevisionType.ADD;
 import static org.hibernate.envers.RevisionType.MOD;
-import static org.simonegiusso.springweb.product.ProductCategory.ELECTRONICS;
 import static org.simonegiusso.springweb.product.ProductController.BASE_PATH;
-import static org.simonegiusso.springweb.support.ProductTestData.ESPRESSO_MACHINE_ID;
-import static org.simonegiusso.springweb.support.ProductTestData.SEEDED_AT;
+import static org.simonegiusso.springweb.support.ProductTestFactory.ADMIN;
+import static org.simonegiusso.springweb.support.ProductTestFactory.ALICE;
+import static org.simonegiusso.springweb.support.ProductTestFactory.BOB;
+import static org.simonegiusso.springweb.support.ProductTestFactory.ESPRESSO_MACHINE_ID;
+import static org.simonegiusso.springweb.support.ProductTestFactory.KEYBOARD_ID;
+import static org.simonegiusso.springweb.support.ProductTestFactory.SEEDED_AT;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON;
 import static org.springframework.test.json.JsonCompareMode.STRICT;
 
+import java.net.URI;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.simonegiusso.springweb.support.AbstractIntegrationTest;
-import org.simonegiusso.springweb.support.ProductTestData;
+import org.simonegiusso.springweb.support.BaseApiIntegrationTest;
+import org.simonegiusso.springweb.support.ProductTestFactory;
+import org.simonegiusso.springweb.support.TestProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.servlet.client.EntityExchangeResult;
+import org.springframework.test.web.servlet.client.RestTestClient;
 
-class ProductApiIntegrationTest extends AbstractIntegrationTest {
+class ProductApiIntegrationTest extends BaseApiIntegrationTest {
 
     private static final UUID UNKNOWN_ID = UUID.fromString("00000000-0000-7000-8000-000000000000");
 
     @Autowired
-    private ProductTestData products;
+    private ProductTestFactory testData;
+
+    @Autowired
+    private TestProductRepository products;
+
+    private RestTestClient admin;
+    private RestTestClient alice;
+    private RestTestClient bob;
 
     @Override
     protected String basePath() {
         return BASE_PATH;
     }
 
+    @BeforeEach
+    void prepareClients() {
+        alice = clientFor(ALICE);
+        bob = clientFor(BOB);
+        admin = clientFor(ADMIN);
+    }
+
     @Test
     void givenExistingProduct_whenGet_thenReturnIt() {
-        products.insertAnEspressoMachine();
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
 
-        client.get()
+        alice.get()
             .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
             .expectStatus().isOk()
             .expectHeader().contentType(APPLICATION_JSON)
@@ -44,7 +64,7 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void givenUnknownId_whenGet_thenReturnProblemDetail() {
-        client.get()
+        alice.get()
             .uri(BASE_PATH + "/{id}", UNKNOWN_ID).exchange()
             .expectStatus().isNotFound()
             .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
@@ -52,9 +72,8 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void givenValidProduct_whenPost_thenCreateItAndReturnItsRepresentation() {
-        EntityExchangeResult<byte[]> response =
-            client.post()
+    void givenValidProduct_whenPost_thenCreateItAndPointAtIt() {
+        URI location = alice.post()
                 .uri(BASE_PATH)
                 .contentType(APPLICATION_JSON)
                 .body(
@@ -69,28 +88,15 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
                         }
                         """).exchange()
                 .expectStatus().isCreated()
-                .expectHeader().contentType(APPLICATION_JSON)
-                .expectBody().json(assertionFile("post-created-product.json"), STRICT)
-                .returnResult();
+                .expectBody().isEmpty()
+                .getResponseHeaders().getLocation();
 
-        Product stored = products.findOnlyProduct();
-
-        assertThat(response.getResponseHeaders().getLocation())
-            .hasToString("http://localhost:" + port + BASE_PATH + "/" + stored.getId());
-        assertThat(stored.getSku()).isEqualTo("SKU-100200");
-        assertThat(stored.getName()).isEqualTo("Mechanical Keyboard");
-        assertThat(stored.getPrice()).isEqualByComparingTo("129.90");
-        assertThat(stored.getStockQuantity()).isEqualTo(42);
-        assertThat(stored.getCategory()).isEqualTo(ELECTRONICS);
-        assertThat(stored.getCreatedAt()).isEqualTo(FIXED_NOW);
-        assertThat(stored.getUpdatedAt()).isEqualTo(FIXED_NOW);
-        assertThat(stored.getVersion()).isZero();
-        assertThat(products.revisionTypes()).containsExactly(ADD);
+        assertProductCreation(alice, location, "post-created-product.json");
     }
 
     @Test
     void givenSeveralInvalidFields_whenPost_thenReportEveryViolationAtOnce() {
-        client.post()
+        alice.post()
             .uri(BASE_PATH)
             .contentType(APPLICATION_JSON)
             .body(
@@ -100,6 +106,7 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
                       "name": "",
                       "price": 0.00,
                       "stockQuantity": -5,
+                      "owner": "bob",
                       "createdAt": "1999-01-01T00:00:00Z"
                     }
                     """)
@@ -108,14 +115,14 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
             .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
             .expectBody().json(assertionFile("post-validation-errors.json"), STRICT);
 
-        assertThat(products.countProducts()).isZero();
+        assertThat(products.count()).isZero();
     }
 
     @Test
     void givenAlreadyUsedSku_whenPost_thenReportAConflict() {
-        products.insertAnEspressoMachine();
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
 
-        client.post()
+        alice.post()
             .uri(BASE_PATH)
             .contentType(APPLICATION_JSON)
             .body(
@@ -133,15 +140,15 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
             .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
             .expectBody().json(assertionFile("post-duplicate-sku-conflict.json"), STRICT);
 
-        assertThat(products.countProducts()).isOne();
+        assertThat(products.count()).isOne();
         assertThat(products.revisionTypes()).isEmpty();
     }
 
     @Test
     void givenExistingProduct_whenPatchSomeFields_thenUpdateOnlyThoseFields() {
-        products.insertAnEspressoMachine();
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
 
-        client.patch()
+        alice.patch()
             .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID)
             .contentType(APPLICATION_JSON)
             .body(
@@ -166,9 +173,9 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void givenSkuInTheBody_whenPatch_thenRejectTheRequest() {
-        products.insertAnEspressoMachine();
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
 
-        client.patch()
+        alice.patch()
             .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID)
             .contentType(APPLICATION_JSON)
             .body(
@@ -192,9 +199,9 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void givenEmptyBody_whenPatch_thenLeaveTheProductUntouched() {
-        products.insertAnEspressoMachine();
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
 
-        client.patch()
+        alice.patch()
             .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID)
             .contentType(APPLICATION_JSON)
             .body("{}")
@@ -208,4 +215,42 @@ class ProductApiIntegrationTest extends AbstractIntegrationTest {
         assertThat(stored.getVersion()).isZero();
         assertThat(products.revisionTypes()).isEmpty();
     }
+
+    @Test
+    void givenAdmin_whenGet_thenSeeTheProductsOfEveryOwner() {
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
+        testData.insertAKeyboardOwnedBy(BOB);
+
+        admin.get()
+            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
+            .expectStatus().isOk()
+            .expectBody().json(assertionFile("stored-product.json"), STRICT);
+
+        admin.get()
+            .uri(BASE_PATH + "/{id}", KEYBOARD_ID).exchange()
+            .expectStatus().isOk()
+            .expectBody().json(assertionFile("stored-keyboard.json"), STRICT);
+    }
+
+    @Test
+    void givenProductOwnedByAnotherUser_whenGet_thenHideItBehindNotFound() {
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
+
+        bob.get()
+            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
+            .expectStatus().isNotFound()
+            .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
+            .expectBody().json(assertionFile("get-product-not-found.json", ESPRESSO_MACHINE_ID), STRICT);
+    }
+
+    private void assertProductCreation(RestTestClient client, URI location, String jsonFile) {
+        client.get()
+            .uri(location).exchange()
+            .expectStatus().isOk()
+            .expectHeader().contentType(APPLICATION_JSON)
+            .expectBody().json(assertionFile(jsonFile), STRICT);
+
+        assertThat(products.revisionTypes()).containsExactly(ADD);
+    }
+
 }

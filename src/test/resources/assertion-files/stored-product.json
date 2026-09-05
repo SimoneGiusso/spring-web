@@ -5,6 +5,7 @@
   "price": 899.00,
   "stockQuantity": 7,
   "category": "HOME",
+  "owner": "alice",
   "createdAt": "2026-01-15T09:00:00Z",
   "updatedAt": "2026-01-15T09:00:00Z"
 }

@@ -41,25 +41,11 @@ public record ProductDTO(
     ProductCategory category,
 
     @Null(message = "is read-only and must not be provided")
+    String owner,
+
+    @Null(message = "is read-only and must not be provided")
     Instant createdAt,
 
     @Null(message = "is read-only and must not be provided")
     Instant updatedAt
-) {
-
-    static ProductDTO from(Product product) {
-        return new ProductDTO(
-            product.getSku(),
-            product.getName(),
-            product.getDescription(),
-            product.getPrice(),
-            product.getStockQuantity(),
-            product.getCategory(),
-            product.getCreatedAt(),
-            product.getUpdatedAt());
-    }
-
-    Product toProduct() {
-        return new Product(sku, name, description, price, stockQuantity, category);
-    }
-}
+) {}

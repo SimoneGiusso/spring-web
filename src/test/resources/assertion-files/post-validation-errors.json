@@ -18,6 +18,10 @@
       "message": "size must be between 1 and 120"
     },
     {
+      "field": "owner",
+      "message": "is read-only and must not be provided"
+    },
+    {
       "field": "price",
       "message": "must be greater than 0.00"
     },

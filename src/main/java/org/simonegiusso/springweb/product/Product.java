@@ -10,13 +10,16 @@ import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.TenantId;
 import org.hibernate.annotations.UuidGenerator;
 import org.hibernate.envers.Audited;
 import org.springframework.data.annotation.CreatedDate;
@@ -24,18 +27,25 @@ import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
-@Table(name = "products")
+@Table(
+    name = "products",
+    uniqueConstraints = @UniqueConstraint(name = "products_owner_sku_unique", columnNames = {"owner", "sku"}))
 @EntityListeners(AuditingEntityListener.class)
 @Audited
 @Getter
 @NoArgsConstructor(access = PROTECTED)
+@AllArgsConstructor
 public class Product {
 
     @Id
     @UuidGenerator(style = VERSION_7)
     private UUID id;
 
-    @Column(nullable = false, unique = true, updatable = false, length = 32)
+    @TenantId
+    @Column(nullable = false, updatable = false, length = 64)
+    private String owner;
+
+    @Column(nullable = false, updatable = false, length = 32)
     private String sku;
 
     @Setter

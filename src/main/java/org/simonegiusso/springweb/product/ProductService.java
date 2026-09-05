@@ -3,22 +3,21 @@ package org.simonegiusso.springweb.product;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.function.Consumer;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
+@RequiredArgsConstructor
 public class ProductService {
 
     private final ProductRepository products;
-
-    ProductService(ProductRepository products) {
-        this.products = products;
-    }
+    private final ProductMapper mapper;
 
     @Transactional
     public Product create(ProductDTO request) {
-        return products.save(request.toProduct());
+        return products.save(mapper.toEntity(request));
     }
 
     @Transactional

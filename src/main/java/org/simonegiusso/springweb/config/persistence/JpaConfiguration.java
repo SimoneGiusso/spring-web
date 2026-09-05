@@ -1,4 +1,4 @@
-package org.simonegiusso.springweb.config;
+package org.simonegiusso.springweb.config.persistence;
 
 import java.time.Clock;
 import java.util.Optional;
@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
 @Configuration(proxyBeanMethods = false)
 @EnableJpaAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
-public class PersistenceConfiguration {
+public class JpaConfiguration {
 
     @Bean
     public Clock clock() {

@@ -100,7 +100,15 @@
       "Bash(mvn -o -q test -Dtest=JaversSchemaDumpTest -DfailIfNoTests=false)",
       "Bash(mvn -o -q test -Dtest=EnversSchemaDumpTest -DfailIfNoTests=false)",
       "Bash(mvn -o test)",
-      "Bash(git --no-pager diff -- pom.xml src/main src/test)"
+      "Bash(git --no-pager diff -- pom.xml src/main src/test)",
+      "Bash(mvn -v)",
+      "Read(//Users/simonegiusso/.m2/repository/org/springframework/boot/spring-boot-hibernate/4.1.0/**)",
+      "Bash(unzip -l spring-boot-hibernate-4.1.0.jar)",
+      "Bash(mvn -o -q test-compile)",
+      "Bash(mvn *)",
+      "Bash(docker exec spring-web-verify *)",
+      "Bash(docker rm *)",
+      "Bash(git --no-pager diff --stat)"
     ]
   }
 }
