@@ -1,0 +1,20 @@
+{
+  "aud": "8f2a1c34-5b6d-4e7f-9a0b-1c2d3e4f5a6b",
+  "iss": "https://login.microsoftonline.com/6c1e0b7a-2d3f-4a5b-8c9d-0e1f2a3b4c5d/v2.0",
+  "iat": 1788595200,
+  "nbf": 1788595200,
+  "exp": 1788598799,
+  "aio": "E2ZgYPjBv8Rk6bSVn1mM7oyLZ9dHAA==",
+  "azp": "b41d9e6f-0a83-4c25-91d7-5e8a4f60b3c2",
+  "azpacr": "1",
+  "idtyp": "app",
+  "oid": "3f9b2e10-7c4d-4a1b-9e8f-2d5c6b7a8e90",
+  "rh": "0.AR8A2sK1qP3mF0eZbT1xUvQ9c0Zg1nAaBcdEfGhIjKlMnOpQrSt.",
+  "roles": [
+    "Catalog.ReadWrite"
+  ],
+  "sub": "3f9b2e10-7c4d-4a1b-9e8f-2d5c6b7a8e90",
+  "tid": "6c1e0b7a-2d3f-4a5b-8c9d-0e1f2a3b4c5d",
+  "uti": "5xQ0aL3nEkm7Rb9YtCvPAA",
+  "ver": "2.0"
+}

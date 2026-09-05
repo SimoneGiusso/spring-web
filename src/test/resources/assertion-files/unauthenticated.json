@@ -1,0 +1,7 @@
+{
+  "type": "https://api.spring-web.example/problems/unauthenticated",
+  "title": "Unauthenticated",
+  "status": 401,
+  "detail": "A valid bearer token is required.",
+  "instance": "${basePath}/${id}"
+}

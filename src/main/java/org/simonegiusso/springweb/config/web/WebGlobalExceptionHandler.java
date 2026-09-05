@@ -1,8 +1,6 @@
 package org.simonegiusso.springweb.config.web;
 
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
-import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -12,15 +10,15 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
-import org.simonegiusso.springweb.config.persistence.InsufficientPermissionException;
-import org.simonegiusso.springweb.config.persistence.UnidentifiedTenantException;
+import org.simonegiusso.springweb.config.security.Problems;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.ObjectError;
+import org.springframework.security.authorization.AuthorizationDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -31,13 +29,9 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 @Slf4j
 class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    private static final String PROBLEM_BASE_URI = "https://api.spring-web.example/problems/";
-
     private static final URI RESOURCE_NOT_FOUND = problemType("resource-not-found");
     private static final URI RESOURCE_CONFLICT = problemType("resource-conflict");
     private static final URI VALIDATION_FAILED = problemType("validation-failed");
-    private static final URI UNIDENTIFIED_TENANT = problemType("unidentified-tenant");
-    private static final URI INSUFFICIENT_PERMISSION = problemType("insufficient-permission");
     private static final URI INTERNAL_ERROR = problemType("internal-error");
 
     @ExceptionHandler(NoSuchElementException.class)
@@ -45,14 +39,10 @@ class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return problem(NOT_FOUND, RESOURCE_NOT_FOUND, "Resource not found", exception.getMessage());
     }
 
-    @ExceptionHandler(UnidentifiedTenantException.class)
-    ProblemDetail handleUnidentifiedTenant(UnidentifiedTenantException exception) {
-        return problem(BAD_REQUEST, UNIDENTIFIED_TENANT, "Unidentified tenant", exception.getMessage());
-    }
-
-    @ExceptionHandler(InsufficientPermissionException.class)
-    ProblemDetail handleInsufficientPermission(InsufficientPermissionException exception) {
-        return problem(FORBIDDEN, INSUFFICIENT_PERMISSION, "Insufficient permission", exception.getMessage());
+    /** Method security throws inside Spring MVC, past the point where the filter chain could answer. */
+    @ExceptionHandler(AuthorizationDeniedException.class)
+    ProblemDetail handleAuthorizationDenied() {
+        return Problems.insufficientPermission();
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -100,19 +90,16 @@ class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
             .toList();
     }
 
-    private static String message(ObjectError error) {
+    private static String message(MessageSourceResolvable error) {
         return error.getDefaultMessage() == null ? "is invalid" : error.getDefaultMessage();
     }
 
     private static ProblemDetail problem(HttpStatus status, URI type, String title, String detail) {
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
-        problem.setType(type);
-        problem.setTitle(title);
-        return problem;
+        return Problems.of(status, type, title, detail);
     }
 
     private static URI problemType(String name) {
-        return URI.create(PROBLEM_BASE_URI + name);
+        return URI.create(Problems.BASE_URI + name);
     }
 
     private record ValidationError(String field, String message) {}

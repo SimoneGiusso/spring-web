@@ -22,10 +22,20 @@ spring:
     virtual:
       enabled: true
 
-server:
-  error:
-    include-message: never
-    include-stacktrace: never
+  web:
+    error:
+      include-message: never
+      include-stacktrace: never
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://login.microsoftonline.com/${ENTRA_TENANT_ID}/v2.0
+          audiences: ${ENTRA_API_CLIENT_ID}
+          authorities-claim-name: roles
+          authority-prefix: ""
+          principal-claim-name: oid
 
 management:
   endpoints:

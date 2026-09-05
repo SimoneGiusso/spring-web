@@ -1,8 +1,9 @@
 package org.simonegiusso.springweb.product;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.simonegiusso.springweb.config.web.Permission.READ;
-import static org.simonegiusso.springweb.config.web.Permission.READ_ALL;
+import static org.simonegiusso.springweb.config.security.Permission.READ;
+import static org.simonegiusso.springweb.config.security.Permission.READ_ALL;
+import static org.simonegiusso.springweb.config.security.Permission.READ_WRITE;
 import static org.simonegiusso.springweb.product.ProductController.BASE_PATH;
 import static org.simonegiusso.springweb.support.ProductTestFactory.ALICE;
 import static org.simonegiusso.springweb.support.ProductTestFactory.BOB;
@@ -41,17 +42,6 @@ class ProductAccessControlIT extends BaseApiIT {
     }
 
     @Test
-    void givenProductOwnedByAnotherUser_whenGet_thenHideItBehindNotFound() {
-        testData.insertAnEspressoMachineOwnedBy(ALICE);
-
-        bob.get()
-            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
-            .expectStatus().isNotFound()
-            .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
-            .expectBody().json(assertionFile("get-product-not-found.json", ESPRESSO_MACHINE_ID), STRICT);
-    }
-
-    @Test
     void givenReadAll_whenGet_thenSeeTheProductsOfEveryOwner() {
         testData.insertAnEspressoMachineOwnedBy(ALICE);
         testData.insertAKeyboardOwnedBy(BOB);
@@ -67,6 +57,16 @@ class ProductAccessControlIT extends BaseApiIT {
             .uri(BASE_PATH + "/{id}", KEYBOARD_ID).exchange()
             .expectStatus().isOk()
             .expectBody().json(assertionFile("stored-keyboard.json"), STRICT);
+    }
+
+    @Test
+    void givenReadWriteAlone_whenGet_thenAllowItBecauseWritingCoversReading() {
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
+
+        clientFor(ALICE, READ_WRITE).get()
+            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
+            .expectStatus().isOk()
+            .expectBody().json(assertionFile("stored-product.json"), STRICT);
     }
 
     @Test
@@ -86,7 +86,7 @@ class ProductAccessControlIT extends BaseApiIT {
                     """).exchange()
             .expectStatus().isForbidden()
             .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
-            .expectBody().json(assertionFile("post-forbidden.json"), STRICT);
+            .expectBody().json(assertionFile("insufficient-permission.json"), STRICT);
 
         assertThat(products.count()).isZero();
     }
@@ -105,14 +105,24 @@ class ProductAccessControlIT extends BaseApiIT {
     }
 
     @Test
-    void givenNoPermissionHeader_whenGet_thenRejectTheRequest() {
+    void givenProductOwnedByAnotherUser_whenGet_thenHideItBehindNotFound() {
         testData.insertAnEspressoMachineOwnedBy(ALICE);
 
-        clientWithoutPermissionFor(ALICE).get()
+        bob.get()
             .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
-            .expectStatus().isForbidden()
+            .expectStatus().isNotFound()
             .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
-            .expectBody().json(assertionFile("missing-permission.json", ESPRESSO_MACHINE_ID), STRICT);
+            .expectBody().json(assertionFile("get-product-not-found.json", ESPRESSO_MACHINE_ID), STRICT);
     }
 
+    @Test
+    void givenNoToken_whenGet_thenRejectItAsUnauthenticated() {
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
+
+        anonymousClient().get()
+            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
+            .expectStatus().isUnauthorized()
+            .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
+            .expectBody().json(assertionFile("unauthenticated.json", ESPRESSO_MACHINE_ID), STRICT);
+    }
 }

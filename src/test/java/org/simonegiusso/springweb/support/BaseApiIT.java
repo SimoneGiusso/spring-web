@@ -1,12 +1,11 @@
 package org.simonegiusso.springweb.support;
 
-import static org.simonegiusso.springweb.config.persistence.TenantHeaderInterceptor.PERMISSION_HEADER;
-import static org.simonegiusso.springweb.config.persistence.TenantHeaderInterceptor.USER_HEADER;
-import static org.simonegiusso.springweb.config.web.Permission.READ_WRITE;
+import static org.simonegiusso.springweb.config.security.Permission.READ_WRITE;
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import java.util.Map;
 import java.util.UUID;
-import org.simonegiusso.springweb.config.web.Permission;
+import org.simonegiusso.springweb.config.security.Permission;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -18,19 +17,20 @@ public abstract class BaseApiIT extends BaseIT {
 
     protected abstract String basePath();
 
-    protected RestTestClient clientFor(String user) {
-        return clientFor(user, READ_WRITE);
+    protected final RestTestClient clientFor(String objectId) {
+        return clientFor(objectId, READ_WRITE);
     }
 
-    protected RestTestClient clientFor(String user, Permission permission) {
-        return clientBuilder()
-            .defaultHeader(USER_HEADER, user)
-            .defaultHeader(PERMISSION_HEADER, permission.name())
-            .build();
+    protected final RestTestClient clientFor(String objectId, Permission... permissions) {
+        return clientBearing(MockEntra.tokenFor(objectId, permissions));
     }
 
-    protected RestTestClient clientWithoutPermissionFor(String user) {
-        return clientBuilder().defaultHeader(USER_HEADER, user).build();
+    protected final RestTestClient clientBearing(String token) {
+        return clientBuilder().defaultHeader(AUTHORIZATION, "Bearer " + token).build();
+    }
+
+    protected final RestTestClient anonymousClient() {
+        return clientBuilder().build();
     }
 
     private RestTestClient.Builder<?> clientBuilder() {
@@ -38,11 +38,11 @@ public abstract class BaseApiIT extends BaseIT {
             .baseUrl("http://localhost:" + port);
     }
 
-    protected String assertionFile(String fileName) {
+    protected final String assertionFile(String fileName) {
         return FileUtils.load(fileName, Map.of("basePath", basePath()));
     }
 
-    protected String assertionFile(String fileName, UUID id) {
+    protected final String assertionFile(String fileName, UUID id) {
         return FileUtils.load(fileName, Map.of("basePath", basePath(), "id", id));
     }
 

@@ -9,6 +9,8 @@ import org.simonegiusso.springweb.TestcontainersConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.convention.TestBean;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 
 @SpringBootTest(webEnvironment = RANDOM_PORT, properties = "spring.docker.compose.enabled=false")
@@ -23,5 +25,10 @@ public abstract class BaseIT {
 
     static Clock clock() {
         return Clock.fixed(FIXED_NOW, UTC);
+    }
+
+    @DynamicPropertySource
+    static void pointTheResourceServerAtTheMockIssuer(DynamicPropertyRegistry registry) {
+        MockEntra.registerIssuer(registry);
     }
 }

@@ -5,7 +5,7 @@ import static org.hibernate.cfg.AvailableSettings.MULTI_TENANT_IDENTIFIER_RESOLV
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
-import org.simonegiusso.springweb.config.web.CurrentUser;
+import org.simonegiusso.springweb.config.security.CurrentUser;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -24,7 +24,7 @@ class HibernateTenantConfiguration implements CurrentTenantIdentifierResolver<St
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        return isARequest() ? currentUser.name() : SYSTEM;
+        return isARequest() ? currentUser.objectId() : SYSTEM;
     }
 
     private static boolean isARequest() {
@@ -33,7 +33,7 @@ class HibernateTenantConfiguration implements CurrentTenantIdentifierResolver<St
 
     @Override
     public boolean isRoot(String tenantId) {
-        return SYSTEM.equals(tenantId) || (isARequest() && currentUser.permission().canReadEveryOwner());
+        return SYSTEM.equals(tenantId) || (isARequest() && currentUser.canReadEveryOwner());
     }
 
     @Override
