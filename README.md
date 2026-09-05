@@ -43,11 +43,14 @@ Discriminator-based multi-tenancy, driven entirely by Hibernate:
   when none does, the work is a scheduled task, a message listener or a test, and it resolves to a
   system tenant that `isRoot` reports as Hibernate's **root tenant** — filter off, every owner
   visible. Background code keeps the ordinary repositories and never mentions tenants.
-- **`admin` is the same mechanism pointed at a person**: also reported as root, so the plain
-  `GET /api/products/{id}` returns any owner's product with no branch in the controller.
+- **Permissions ride the same mechanism.** `X-Permission` carries `READ`, `READ_WRITE` or
+  `READ_ALL`. These are not escalating levels: `READ_ALL` widens *which rows are visible* by being
+  reported as root, while `READ_WRITE` grants *writes* over the caller's own rows only. The
+  interceptor rejects a modifying method without `READ_WRITE` with `403`, so the controller has no
+  branch and `READ_ALL` cannot write to anyone's catalog.
 
-`X-User` stands in for authentication, which is not implemented. Any caller can claim any identity,
-`admin` included.
+`X-User` and `X-Permission` stand in for authentication and authorisation, neither of which is
+implemented. Any caller can claim any identity and any permission.
 
 ### API and error handling
 
@@ -128,10 +131,11 @@ mvn spring-boot:run   # app on :8080, health at /actuator/health
 
 ```bash
 # every request identifies its user; products are visible only to their owner
-curl -X POST localhost:8080/api/products -H 'Content-Type: application/json' -H 'X-User: alice' \
+curl -X POST localhost:8080/api/products -H 'Content-Type: application/json' \
+  -H 'X-User: alice' -H 'X-Permission: READ_WRITE' \
   -d '{"sku":"SKU-000001","name":"Widget","price":10.00,"stockQuantity":5,"category":"HOME"}'
 
-curl localhost:8080/api/products/{id} -H 'X-User: alice'   # 200
-curl localhost:8080/api/products/{id} -H 'X-User: bob'     # 404 — not bob's
-curl localhost:8080/api/products/{id} -H 'X-User: admin'   # 200 — admin sees every owner
+curl localhost:8080/api/products/{id} -H 'X-User: alice' -H 'X-Permission: READ'      # 200
+curl localhost:8080/api/products/{id} -H 'X-User: bob'   -H 'X-Permission: READ'      # 404 — not bob's
+curl localhost:8080/api/products/{id} -H 'X-User: bob'   -H 'X-Permission: READ_ALL'  # 200 — every owner
 ```

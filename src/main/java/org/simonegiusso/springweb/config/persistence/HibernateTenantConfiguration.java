@@ -3,6 +3,7 @@ package org.simonegiusso.springweb.config.persistence;
 import static org.hibernate.cfg.AvailableSettings.MULTI_TENANT_IDENTIFIER_RESOLVER;
 
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.simonegiusso.springweb.config.web.CurrentUser;
 import org.springframework.boot.hibernate.autoconfigure.HibernatePropertiesCustomizer;
@@ -14,17 +15,12 @@ import org.springframework.web.context.request.RequestContextHolder;
  * Boot when it builds the {@code EntityManagerFactory}.
  */
 @Component
+@RequiredArgsConstructor
 class HibernateTenantConfiguration implements CurrentTenantIdentifierResolver<String>, HibernatePropertiesCustomizer {
 
     static final String SYSTEM = "__system__";
 
-    private static final String ADMIN = "admin";
-
     private final CurrentUser currentUser;
-
-    HibernateTenantConfiguration(CurrentUser currentUser) {
-        this.currentUser = currentUser;
-    }
 
     @Override
     public String resolveCurrentTenantIdentifier() {
@@ -37,7 +33,7 @@ class HibernateTenantConfiguration implements CurrentTenantIdentifierResolver<St
 
     @Override
     public boolean isRoot(String tenantId) {
-        return SYSTEM.equals(tenantId) || ADMIN.equals(tenantId);
+        return SYSTEM.equals(tenantId) || (isARequest() && currentUser.permission().canReadEveryOwner());
     }
 
     @Override

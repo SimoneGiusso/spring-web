@@ -1,0 +1,7 @@
+{
+  "type": "https://api.spring-web.example/problems/insufficient-permission",
+  "title": "Insufficient permission",
+  "status": 403,
+  "detail": "Permission READ may not modify products; READ_WRITE is required",
+  "instance": "${basePath}"
+}

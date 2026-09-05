@@ -12,7 +12,6 @@ public class ProductTestFactory {
 
     public static final String ALICE = "alice";
     public static final String BOB = "bob";
-    public static final String ADMIN = "admin";
     public static final UUID ESPRESSO_MACHINE_ID = UUID.fromString("0198e2c5-1a2b-7c3d-8e4f-000000000001");
     public static final Instant SEEDED_AT = Instant.parse("2026-01-15T09:00:00Z");
     public static final UUID KEYBOARD_ID = UUID.fromString("0198e2c5-1a2b-7c3d-8e4f-000000000002");

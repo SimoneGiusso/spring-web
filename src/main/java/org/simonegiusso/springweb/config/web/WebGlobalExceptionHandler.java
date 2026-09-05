@@ -2,6 +2,7 @@ package org.simonegiusso.springweb.config.web;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
+import org.simonegiusso.springweb.config.persistence.InsufficientPermissionException;
 import org.simonegiusso.springweb.config.persistence.UnidentifiedTenantException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -35,6 +37,7 @@ class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
     private static final URI RESOURCE_CONFLICT = problemType("resource-conflict");
     private static final URI VALIDATION_FAILED = problemType("validation-failed");
     private static final URI UNIDENTIFIED_TENANT = problemType("unidentified-tenant");
+    private static final URI INSUFFICIENT_PERMISSION = problemType("insufficient-permission");
     private static final URI INTERNAL_ERROR = problemType("internal-error");
 
     @ExceptionHandler(NoSuchElementException.class)
@@ -45,6 +48,11 @@ class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(UnidentifiedTenantException.class)
     ProblemDetail handleUnidentifiedTenant(UnidentifiedTenantException exception) {
         return problem(BAD_REQUEST, UNIDENTIFIED_TENANT, "Unidentified tenant", exception.getMessage());
+    }
+
+    @ExceptionHandler(InsufficientPermissionException.class)
+    ProblemDetail handleInsufficientPermission(InsufficientPermissionException exception) {
+        return problem(FORBIDDEN, INSUFFICIENT_PERMISSION, "Insufficient permission", exception.getMessage());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

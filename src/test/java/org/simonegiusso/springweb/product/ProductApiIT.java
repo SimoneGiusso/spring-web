@@ -4,11 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hibernate.envers.RevisionType.ADD;
 import static org.hibernate.envers.RevisionType.MOD;
 import static org.simonegiusso.springweb.product.ProductController.BASE_PATH;
-import static org.simonegiusso.springweb.support.ProductTestFactory.ADMIN;
 import static org.simonegiusso.springweb.support.ProductTestFactory.ALICE;
 import static org.simonegiusso.springweb.support.ProductTestFactory.BOB;
 import static org.simonegiusso.springweb.support.ProductTestFactory.ESPRESSO_MACHINE_ID;
-import static org.simonegiusso.springweb.support.ProductTestFactory.KEYBOARD_ID;
 import static org.simonegiusso.springweb.support.ProductTestFactory.SEEDED_AT;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
@@ -35,7 +33,6 @@ class ProductApiIT extends BaseApiIT {
     @Autowired
     private TestProductRepository products;
 
-    private RestTestClient admin;
     private RestTestClient alice;
     private RestTestClient bob;
 
@@ -48,7 +45,6 @@ class ProductApiIT extends BaseApiIT {
     void prepareClients() {
         alice = clientFor(ALICE);
         bob = clientFor(BOB);
-        admin = clientFor(ADMIN);
     }
 
     @Test
@@ -214,33 +210,6 @@ class ProductApiIT extends BaseApiIT {
         assertThat(stored.getUpdatedAt()).isEqualTo(SEEDED_AT);
         assertThat(stored.getVersion()).isZero();
         assertThat(products.revisionTypes()).isEmpty();
-    }
-
-    @Test
-    void givenAdmin_whenGet_thenSeeTheProductsOfEveryOwner() {
-        testData.insertAnEspressoMachineOwnedBy(ALICE);
-        testData.insertAKeyboardOwnedBy(BOB);
-
-        admin.get()
-            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
-            .expectStatus().isOk()
-            .expectBody().json(assertionFile("stored-product.json"), STRICT);
-
-        admin.get()
-            .uri(BASE_PATH + "/{id}", KEYBOARD_ID).exchange()
-            .expectStatus().isOk()
-            .expectBody().json(assertionFile("stored-keyboard.json"), STRICT);
-    }
-
-    @Test
-    void givenProductOwnedByAnotherUser_whenGet_thenHideItBehindNotFound() {
-        testData.insertAnEspressoMachineOwnedBy(ALICE);
-
-        bob.get()
-            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
-            .expectStatus().isNotFound()
-            .expectHeader().contentType(APPLICATION_PROBLEM_JSON)
-            .expectBody().json(assertionFile("get-product-not-found.json", ESPRESSO_MACHINE_ID), STRICT);
     }
 
     private void assertProductCreation(RestTestClient client, URI location, String jsonFile) {

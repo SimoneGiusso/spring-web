@@ -1,0 +1,7 @@
+{
+  "type": "https://api.spring-web.example/problems/insufficient-permission",
+  "title": "Insufficient permission",
+  "status": 403,
+  "detail": "No permission claimed; header X-Permission must grant one of READ, READ_WRITE, READ_ALL",
+  "instance": "${basePath}/${id}"
+}
