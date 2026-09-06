@@ -1,0 +1,8 @@
+# Runs the application without an Entra tenant, against the mock issuer in compose.yaml.
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/entra
+          audiences: catalog-api

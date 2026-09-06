@@ -20,6 +20,7 @@ is enforced by the persistence layer instead of by checks scattered through appl
 | Flyway | schema migrations, versioned and checksummed |
 | Testcontainers | a throw-away PostgreSQL for the test suite |
 | mock-oauth2-server | a real authorisation server for the test suite, so the real decoder runs |
+| springdoc-openapi | derives the OpenAPI document and serves Swagger UI |
 | Actuator | health and info endpoints |
 
 ## How it is built
@@ -150,6 +151,18 @@ before a controller is reached — unreadable JSON, wrong media type, unknown ro
 variable — is already rendered as `application/problem+json`. The advice adds the rest, and overrides
 `handleMethodArgumentNotValid` to attach a sorted machine-readable `errors` array.
 
+### API documentation
+
+springdoc derives the whole document from what is already there — the controller's mappings, the
+`ProductDTO` record and its Bean Validation constraints, so `sku` arrives in the schema carrying its
+`SKU-\d{6}` pattern without being described twice. Only the bearer scheme is declared by hand, since
+nothing in the code says the API needs a token.
+
+```
+/v3/api-docs          the OpenAPI document
+/swagger-ui.html      Swagger UI, with an Authorize box for pasting an Entra token
+```
+
 ### Validation
 
 One DTO serves create, patch and response, with per-endpoint rules tagged by **validation group**.
@@ -227,16 +240,47 @@ mvn test              # integration tests against a throw-away PostgreSQL contai
 mvn spring-boot:run   # app on :8080, health at /actuator/health
 ```
 
-Running the application needs an Entra app registration: set `ENTRA_TENANT_ID` and
-`ENTRA_API_CLIENT_ID`, and expose `Catalog.Read`, `Catalog.ReadWrite` and `Catalog.Read.All` as app
-roles. The test suite needs neither — it runs its own issuer.
+`mvn spring-boot:run` needs no Entra tenant. It activates the `local` profile, and
+[`compose.yaml`](compose.yaml) starts a mock issuer alongside PostgreSQL — a real OIDC server with
+discovery, JWKS and signatures, issuing Entra-shaped tokens. Security is not disabled or weakened:
+the same filter chain runs, against the same decoder, and an unauthenticated request still gets
+`401`. Only the issuer is local.
+
+Four callers are configured, one per interesting role. The client id becomes the `oid`, and so the
+tenant:
+
+| `client_id` | Roles | |
+|---|---|---|
+| `alice`, `bob` | `Catalog.ReadWrite` | two tenants, each blind to the other |
+| `reader` | `Catalog.Read` | reads its own; a write is `403` |
+| `auditor` | `Catalog.Read.All` | reads every owner; a write is `403` |
 
 ```bash
-# a service principal's token; oid decides which products are visible, roles what may be done
-TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/$ENTRA_TENANT_ID/oauth2/v2.0/token" \
-  -d grant_type=client_credentials -d "client_id=$CLIENT_ID" -d "client_secret=$CLIENT_SECRET" \
-  -d "scope=$ENTRA_API_CLIENT_ID/.default" | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
+TOKEN=$(curl -s -X POST http://localhost:8081/entra/token \
+  -d grant_type=client_credentials -d client_id=alice -d client_secret=secret \
+  | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
 
-curl localhost:8080/api/products/{id} -H "Authorization: Bearer $TOKEN"
-curl localhost:8080/api/products/{id}                       # 401 — problem document, no token
+curl localhost:8080/api/products -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"sku":"SKU-000001","name":"Widget","price":10.00,"stockQuantity":5,"category":"HOME"}'
 ```
+
+Against a real tenant instead, set `ENTRA_TENANT_ID` and `ENTRA_API_CLIENT_ID` and drop the profile
+(`mvn spring-boot:run -Dspring-boot.run.profiles=`), having exposed `Catalog.Read`,
+`Catalog.ReadWrite` and `Catalog.Read.All` as app roles on the registration. The test suite needs
+neither — it runs its own issuer in-process.
+
+```bash
+curl localhost:8080/api/products/{id} -H "Authorization: Bearer $TOKEN"   # 200 if it is yours
+curl localhost:8080/api/products/{id} -H "Authorization: Bearer $BOBS"    # 404 — never 403
+curl localhost:8080/api/products/{id}                                     # 401 problem document
+```
+
+### Browsing the documentation
+
+With the application running, it documents itself:
+
+| | |
+|---|---|
+| <http://localhost:8080/swagger-ui.html> | Swagger UI |
+| <http://localhost:8080/v3/api-docs> | the raw OpenAPI document |
