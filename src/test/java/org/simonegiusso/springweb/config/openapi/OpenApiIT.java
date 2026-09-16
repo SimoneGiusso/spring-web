@@ -23,7 +23,11 @@ class OpenApiIT extends BaseApiIT {
             .jsonPath("$.paths['/api/products/{id}'].get").exists()
             .jsonPath("$.paths['/api/products/{id}'].patch").exists()
             .jsonPath("$.components.securitySchemes.entra-bearer-token.scheme").isEqualTo("bearer")
-            .jsonPath("$.components.schemas.ProductDTO.properties.sku.pattern").isEqualTo("SKU-\\d{6}");
+            .jsonPath("$.components.schemas.ProductDTO.properties.sku.pattern").isEqualTo("SKU-\\d{6}")
+            .jsonPath("$.components.schemas.ProductDTO.properties.sku.example").isEqualTo("SKU-100200")
+            .jsonPath("$.components.schemas.ProductDTO.properties.owner.readOnly").isEqualTo(true)
+            .jsonPath("$.components.schemas.ProductDTO.properties.createdAt.readOnly").isEqualTo(true)
+            .jsonPath("$.components.schemas.ProductDTO.properties.updatedAt.readOnly").isEqualTo(true);
     }
 
     @Test

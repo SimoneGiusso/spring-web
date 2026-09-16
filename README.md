@@ -385,11 +385,8 @@ Tempo and Prometheus already connected.
 `ProductCountLogger` writes a line every ten seconds, so Loki has something in it before the first
 request is ever made — and that line carries no tenant, because a scheduled task has none.
 
-To export somewhere other than the local stack, drop the profile and point the standard OpenTelemetry
-variable at a collector; the three exporters follow it:
-
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://collector.internal:4318 mvn spring-boot:run
+mvn spring-boot:run
 ```
 
 ### Browsing the documentation
