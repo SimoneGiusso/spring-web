@@ -17,6 +17,10 @@ public abstract class BaseApiIT extends BaseIT {
 
     protected abstract String basePath();
 
+    protected final RestTestClient defaultClient() {
+        return clientFor("alice", READ_WRITE);
+    }
+
     protected final RestTestClient clientFor(String objectId) {
         return clientFor(objectId, READ_WRITE);
     }

@@ -20,6 +20,8 @@ class OpenApiIT extends BaseApiIT {
             .expectHeader().contentType(APPLICATION_JSON)
             .expectBody()
             .jsonPath("$.paths['/api/products'].post").exists()
+            .jsonPath("$.paths['/api/products/import'].post.requestBody.content['multipart/form-data']").exists()
+            .jsonPath("$.paths['/api/products/import'].post.responses['201']").exists()
             .jsonPath("$.paths['/api/products/{id}'].get").exists()
             .jsonPath("$.paths['/api/products/{id}'].patch").exists()
             .jsonPath("$.components.securitySchemes.entra-bearer-token.scheme").isEqualTo("bearer")

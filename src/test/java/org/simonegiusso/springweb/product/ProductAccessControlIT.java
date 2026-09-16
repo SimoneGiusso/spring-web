@@ -15,26 +15,11 @@ import static org.springframework.test.json.JsonCompareMode.STRICT;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.simonegiusso.springweb.support.BaseApiIT;
-import org.simonegiusso.springweb.support.ProductTestFactory;
-import org.simonegiusso.springweb.support.TestProductRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.client.RestTestClient;
 
-class ProductAccessControlIT extends BaseApiIT {
-
-    @Autowired
-    private ProductTestFactory testData;
-
-    @Autowired
-    private TestProductRepository products;
+class ProductAccessControlIT extends BaseProductApiIT {
 
     private RestTestClient bob;
-
-    @Override
-    protected String basePath() {
-        return BASE_PATH;
-    }
 
     @BeforeEach
     void prepareClients() {

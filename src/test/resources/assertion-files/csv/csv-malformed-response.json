@@ -1,0 +1,6 @@
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "Unable to read CSV. Supply valid UTF-8 CSV with properly quoted fields.",
+  "instance": "${basePath}"
+}

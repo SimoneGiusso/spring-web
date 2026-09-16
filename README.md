@@ -1,8 +1,22 @@
 # spring-web
 
-A template for a **multi-tenant REST API** on Spring Boot. The domain — a product catalog — is
-deliberately thin. The point is everything around it: each row belongs to a user, and that isolation
-is enforced by the persistence layer instead of by checks scattered through application code.
+A template for a **multi-tenant REST API** on Spring Boot, built around a product catalog. It
+demonstrates secure access, tenant isolation, file imports and observability with integration tests
+against real infrastructure.
+
+- **Authentication and authorisation:** an OAuth2 resource server validates Microsoft Entra ID JWT
+  bearer tokens and enforces read, write and cross-tenant read permissions through app roles.
+- **Tenant isolation:** products belong to the calling service principal; Hibernate enforces
+  ownership when reading and writing data.
+- **JSON endpoints and CSV uploads:** create, retrieve and partially update products, or import a
+  CSV file through `POST /api/products/import`. Imports validate every row and roll back the entire
+  upload on failure.
+- **Validation and API documentation:** request validation, structured problem responses and
+  generated OpenAPI documentation with an interactive Swagger UI, including file uploads.
+- **Auditing:** automatic creation and update timestamps, plus a revision history of product changes.
+- **Observability:** correlated metrics, traces and logs exported through OpenTelemetry to Grafana LGTM.
+- **Local development and integration tests:** Docker Compose supplies PostgreSQL, a mock OAuth2
+  issuer and LGTM; tests use Testcontainers and JSON fixtures to verify API responses.
 
 **Java 21 · Spring Boot 4.1 · Spring Framework 7 · Hibernate 7.4 · PostgreSQL 17 · OpenTelemetry**
 
@@ -146,11 +160,12 @@ Discriminator-based multi-tenancy, driven entirely by Hibernate:
 
 ### API and error handling
 
-Three endpoints, each naming the roles it accepts:
+Four endpoints, each naming the roles it accepts:
 
 | | | Roles |
 |---|---|---|
 | `POST` | `/api/products` | `Catalog.ReadWrite` |
+| `POST` | `/api/products/import` | `Catalog.ReadWrite` |
 | `GET` | `/api/products/{id}` | `Catalog.Read` · `Catalog.ReadWrite` · `Catalog.Read.All` |
 | `PATCH` | `/api/products/{id}` | `Catalog.ReadWrite` |
 
@@ -324,6 +339,28 @@ inside a test, which is how `ObservabilityIT` gets a Grafana container and no ot
 one.
 
 ## Running
+
+### CSV product import
+
+`POST /api/products/import` accepts a multipart file part named `file` and requires
+`Catalog.ReadWrite`. Swagger UI provides a file upload control. Use UTF-8 CSV with this exact header:
+
+```csv
+sku,name,description,price,stockQuantity,category
+SKU-100200,Mechanical Keyboard,"Compact, sturdy",129.90,42,ELECTRONICS
+SKU-100201,Desk,,200.00,3,HOME
+```
+
+```bash
+curl http://localhost:8080/api/products/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F 'file=@products.csv;type=text/csv'
+```
+
+The response is `201` with `{"imported":2}`. CSV uploads are limited to 5 MB; larger files receive
+`413 Content Too Large`.
+
+### Local startup
 
 Requires **Java 21** and a running **Docker** daemon.
 

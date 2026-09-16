@@ -1,0 +1,6 @@
+{
+  "title": "Bad Request",
+  "status": 400,
+  "detail": "CSV record 2: Cannot deserialize value of type `java.math.BigDecimal` from String \"oops\": not a valid representation\n at [Source: (InputStreamReader); line: 2, column: 22] (through reference chain: org.simonegiusso.springweb.product.ProductDTO[\"price\"])",
+  "instance": "${basePath}"
+}

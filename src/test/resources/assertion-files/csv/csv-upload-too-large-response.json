@@ -1,0 +1,7 @@
+{
+  "type": "https://api.spring-web.example/problems/upload-too-large",
+  "title": "Upload too large",
+  "status": 413,
+  "detail": "The uploaded file exceeds the 1KB size limit.",
+  "instance": "${basePath}"
+}

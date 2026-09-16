@@ -10,9 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.simonegiusso.springweb.config.security.Permission;
 import org.simonegiusso.springweb.config.security.Roles;
-import org.simonegiusso.springweb.support.BaseApiIT;
 import org.simonegiusso.springweb.support.MockEntra;
-import org.simonegiusso.springweb.support.ProductTestFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -23,18 +21,10 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
  * server. These cover only whether a token is accepted at all; the role and tenancy matrix is
  * exercised separately.
  */
-class TokenValidationIT extends BaseApiIT {
-
-    @Autowired
-    private ProductTestFactory testData;
+class TokenValidationIT extends BaseProductApiIT {
 
     @Autowired
     private JwtAuthenticationConverter converter;
-
-    @Override
-    protected String basePath() {
-        return BASE_PATH;
-    }
 
     @Test
     void givenAValidToken_whenGet_thenAcceptIt() {

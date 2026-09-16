@@ -3,6 +3,7 @@ package org.simonegiusso.springweb.config.web;
 import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.CONTENT_TOO_LARGE;
 
 import java.net.URI;
 import java.util.Comparator;
@@ -11,6 +12,7 @@ import java.util.NoSuchElementException;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.simonegiusso.springweb.config.security.Problems;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.MessageSourceResolvable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -23,6 +25,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 @RestControllerAdvice
@@ -31,8 +34,12 @@ class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final URI RESOURCE_NOT_FOUND = problemType("resource-not-found");
     private static final URI RESOURCE_CONFLICT = problemType("resource-conflict");
+    private static final URI UPLOAD_TOO_LARGE = problemType("upload-too-large");
     private static final URI VALIDATION_FAILED = problemType("validation-failed");
     private static final URI INTERNAL_ERROR = problemType("internal-error");
+
+    @Value("${spring.servlet.multipart.max-file-size}")
+    private String maxFileSize;
 
     @ExceptionHandler(NoSuchElementException.class)
     ProblemDetail handleNotFound(NoSuchElementException exception) {
@@ -53,6 +60,21 @@ class WebGlobalExceptionHandler extends ResponseEntityExceptionHandler {
             RESOURCE_CONFLICT,
             "Conflicting resource state",
             "The request conflicts with the current state of the resource.");
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+        MaxUploadSizeExceededException exception,
+        HttpHeaders headers,
+        HttpStatusCode status,
+        WebRequest request) {
+
+        ProblemDetail problem = problem(
+            CONTENT_TOO_LARGE,
+            UPLOAD_TOO_LARGE,
+            "Upload too large",
+            "The uploaded file exceeds the %s size limit.".formatted(maxFileSize));
+        return handleExceptionInternal(exception, problem, headers, CONTENT_TOO_LARGE, request);
     }
 
     @ExceptionHandler(Exception.class)
