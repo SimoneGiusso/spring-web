@@ -4,7 +4,7 @@ A template for a **multi-tenant REST API** on Spring Boot. The domain — a prod
 deliberately thin. The point is everything around it: each row belongs to a user, and that isolation
 is enforced by the persistence layer instead of by checks scattered through application code.
 
-**Java 21 · Spring Boot 4.1 · Spring Framework 7 · Hibernate 7.4 · PostgreSQL 17**
+**Java 21 · Spring Boot 4.1 · Spring Framework 7 · Hibernate 7.4 · PostgreSQL 17 · OpenTelemetry**
 
 ## Libraries
 
@@ -18,10 +18,14 @@ is enforced by the persistence layer instead of by checks scattered through appl
 | MapStruct | entity ⇄ DTO conversions, generated at compile time |
 | Lombok | accessors, constructors, loggers |
 | Flyway | schema migrations, versioned and checksummed |
-| Testcontainers | a throw-away PostgreSQL for the test suite |
+| Testcontainers | a throw-away PostgreSQL and Grafana stack for the test suite |
 | mock-oauth2-server | a real authorisation server for the test suite, so the real decoder runs |
 | springdoc-openapi | derives the OpenAPI document and serves Swagger UI |
 | Actuator | health and info endpoints |
+| Micrometer · Micrometer Tracing | the meters and spans everything else is derived from |
+| OpenTelemetry SDK · OTLP exporters | metrics, traces and logs off the process over one protocol |
+| OpenTelemetry Logback appender | the half Spring Boot leaves out: Logback events into the SDK |
+| Grafana LGTM | Loki, Tempo, Prometheus and Grafana in one image, locally and in the suite |
 
 ## How it is built
 
@@ -142,6 +146,14 @@ Discriminator-based multi-tenancy, driven entirely by Hibernate:
 
 ### API and error handling
 
+Three endpoints, each naming the roles it accepts:
+
+| | | Roles |
+|---|---|---|
+| `POST` | `/api/products` | `Catalog.ReadWrite` |
+| `GET` | `/api/products/{id}` | `Catalog.Read` · `Catalog.ReadWrite` · `Catalog.Read.All` |
+| `PATCH` | `/api/products/{id}` | `Catalog.ReadWrite` |
+
 Class-level `@RequestMapping` fixes the base path and media type. `POST` answers `201` with a
 `Location` built from an injected `UriComponentsBuilder` and **no body** — clients follow the link.
 
@@ -184,20 +196,92 @@ an injectable **`Clock` bean** rather than the system clock — the single indir
 pin time. Envers adds the other axis: one `@Audited` writes a revision row holding the whole product
 at every change.
 
+### Observability
+
+**LGTM** is Grafana's stack — **L**oki for logs, **G**rafana over the top, **T**empo for traces and
+**M**imir for metrics. The [`grafana/otel-lgtm`](https://github.com/grafana/docker-otel-lgtm) image
+packages it as a single container, with Prometheus standing in for Mimir, behind an OpenTelemetry
+collector and with the three already wired up as Grafana data sources. It runs beside PostgreSQL in
+[`compose.yaml`](compose.yaml), and again as a container in the test suite.
+
+Every signal leaves over **OTLP**, on one connection. No Loki appender pushing logs, no
+`/actuator/prometheus` for Prometheus to scrape: the collector receives metrics, traces and logs and
+fans them out, so the application knows one protocol and one address.
+
+`spring-boot-starter-opentelemetry` supplies two of the three — `micrometer-registry-otlp` for
+meters, Micrometer Tracing over the OpenTelemetry bridge for spans. Logs are the part Spring Boot
+leaves open: it configures an `SdkLoggerProvider` and an exporter, but nothing hands Logback events
+to them. `opentelemetry-logback-appender` is that half, declared in
+[`logback-spring.xml`](src/main/resources/logback-spring.xml) and given the `OpenTelemetry` bean by
+`OpenTelemetryLogbackInstaller`. Logback starts long before the application context does, so the
+appender buffers what it receives until then and replays it — startup is not missing from Loki.
+
+**The endpoints are declared, not discovered.** `spring-boot-docker-compose` recognises the image
+and will wire all three exporters to it on its own, but that wiring is invisible — nothing in the
+configuration says where telemetry goes, and the answer is a rule you have to know. So
+[`compose.yaml`](compose.yaml) carries the `org.springframework.boot.ignore` label, which switches
+the auto-wiring off, publishes 4318 on a fixed port, and
+[`application-local.yml`](src/main/resources/application-local.yml) names the three endpoints:
+
+```yaml
+management.opentelemetry.tracing.export.otlp.endpoint: http://localhost:4318/v1/traces
+management.opentelemetry.logging.export.otlp.endpoint: http://localhost:4318/v1/logs
+management.otlp.metrics.export.url:                    http://localhost:4318/v1/metrics
+```
+
+One collector, one port, three paths — the paths are OTLP's, one per signal. Metrics is the odd
+spelling because it goes through Micrometer's registry rather than the OpenTelemetry SDK, so it is
+`url` under a different prefix instead of `endpoint` beside the other two.
+
+The label is load-bearing rather than decorative: a connection detail contributed by Docker Compose
+takes precedence over a property, so without it these three lines would be read, overridden and
+never used — configuration that looks authoritative and is not. It is detected by the presence of
+the key, not its value, and it governs only the wiring: `docker compose up --wait` still holds the
+application back until the stack is healthy.
+
+The base [`application.yml`](src/main/resources/application.yml) names no endpoint at all. Anywhere
+other than a laptop the standard `OTEL_EXPORTER_OTLP_ENDPOINT` is mapped onto the same properties by
+Spring Boot, so deploying against a real backend is one environment variable — and until something
+supplies an endpoint nothing is exported, which is why the rest of the test suite needs no
+collector. What it does set is `management.tracing.sampling.probability: 1.0`: every request traced,
+which is what a template wants to demonstrate and a busy service would not survive.
+
+**The tenant travels with the telemetry.** `TenantObservabilityFilter` runs nested inside the
+security chain — Spring Boot orders that at `-100` and an unordered filter last — so by then the
+token is decoded and the caller known. It puts the `oid` on the current span and in the MDC, and both
+ends come back out queryable:
+
+| | |
+|---|---|
+| `{ span.tenant = "alice" }` | TraceQL — every trace that caller produced |
+| `{service_name="spring-web"} \| tenant="alice"` | LogQL — every line those requests logged |
+
+It is added as a **high-cardinality** key value, which is the load-bearing word: Micrometer puts
+those on the span only, while low-cardinality ones also become metric tags — and one time series per
+tenant is how a metrics backend falls over. A trace can afford a distinct value per request; a meter
+cannot.
+
+Correlation comes free in every direction. The console pattern carries `[traceId-spanId]`; the
+exported log records carry the same two as fields Loki indexes; and the request histogram carries
+**exemplars**, single samples tagged with the trace they came from. A spike on a graph leads to the
+trace that caused it, and that trace leads to the lines it logged — without anyone having to
+correlate by timestamp.
+
 ### Schema and scheduling
 
 Flyway owns the schema and `ddl-auto: validate` makes Hibernate check its mapping against it without
 ever modifying it. `@Scheduled` demonstrates the system path: a task that reads across every owner
 while containing no tenancy code.
 
-Request handling runs on **virtual threads**, and `spring-boot-docker-compose` starts the database
-before the app.
+Request handling runs on **virtual threads**, and `spring-boot-docker-compose` starts the database,
+the mock issuer and the Grafana stack, then waits for each to report healthy before the app comes
+up.
 
 ## Testing
 
-Integration tests only, over HTTP against a real PostgreSQL started by Testcontainers via
-`@ServiceConnection`. The base classes split by what a test needs, so nothing inherits what it does
-not use:
+Integration tests only, over HTTP against a real PostgreSQL — and, for the observability suite, a
+real Grafana stack — started by Testcontainers via `@ServiceConnection`. The base classes split by
+what a test needs, so nothing inherits what it does not use:
 
 | | |
 |---|---|
@@ -218,6 +302,12 @@ not use:
   `sub` equal to `oid`. Without it the mock would only ever agree with whatever the configuration
   already assumed. **The committed file is synthetic**: it has the shape and claim set of a real
   token but none of its values came from a tenant, so run the capture script before trusting it.
+- **`LgtmStackContainer`** starts the same image the local stack uses, and `ObservabilityIT` asks
+  Tempo, Prometheus and Loki whether the request it just made arrived. A telemetry pipeline is only
+  worth asserting from the far end: the exporters are never inspected, the backends are queried in
+  their own languages. `@SpringBootTest` switches metric export and tracing off, so
+  `@AutoConfigureMetrics` and `@AutoConfigureTracing` ask for them back — which makes that context
+  different from every other test's, and is why it owns its containers rather than sharing them.
 - **`@TestBean`** swaps the `Clock` for a fixed one, making audit timestamps exactly assertable.
 - **`@Sql`** truncates before each method. It runs *before* `@BeforeEach`, so per-test seeding cannot
   live there.
@@ -229,16 +319,20 @@ not use:
 Test fixtures are plain `@Component`s: test classes sit under the same base package as
 `@SpringBootApplication` and `target/test-classes` is on the classpath while testing, so the
 application's own component scan finds them. Only `TestcontainersConfiguration` is imported, because
-Boot deliberately holds `@TestConfiguration` back from scanning.
+Boot deliberately holds `@TestConfiguration` back from scanning — with one exception, a class nested
+inside a test, which is how `ObservabilityIT` gets a Grafana container and no other test pays for
+one.
 
 ## Running
 
 Requires **Java 21** and a running **Docker** daemon.
 
 ```bash
-mvn test              # integration tests against a throw-away PostgreSQL container
-mvn spring-boot:run   # app on :8080, health at /actuator/health
+mvn test              # integration tests against throw-away PostgreSQL and Grafana containers
+mvn spring-boot:run   # app on :8080, health at /actuator/health, Grafana on :3000
 ```
+
+The first run pulls `grafana/otel-lgtm`, which is a large image; everything after that is cached.
 
 `mvn spring-boot:run` needs no Entra tenant. It activates the `local` profile, and
 [`compose.yaml`](compose.yaml) starts a mock issuer alongside PostgreSQL — a real OIDC server with
@@ -274,6 +368,28 @@ neither — it runs its own issuer in-process.
 curl localhost:8080/api/products/{id} -H "Authorization: Bearer $TOKEN"   # 200 if it is yours
 curl localhost:8080/api/products/{id} -H "Authorization: Bearer $BOBS"    # 404 — never 403
 curl localhost:8080/api/products/{id}                                     # 401 problem document
+```
+
+### Watching it run
+
+`compose.yaml` starts the LGTM stack alongside the database, and `application-local.yml` points the
+three exporters at it. Grafana is on <http://localhost:3000> — anonymous, no login form, with Loki,
+Tempo and Prometheus already connected.
+
+| Explore ▸ | Query | |
+|---|---|---|
+| Tempo | `{ span.tenant = "alice" }` | every trace one caller produced |
+| Loki | `{service_name="spring-web"} \| tenant="alice"` | every line those requests logged, with its `trace_id` |
+| Prometheus | `http_server_requests_milliseconds_count` | the request timer — by `uri`, `method` and `status`, and deliberately not by tenant |
+
+`ProductCountLogger` writes a line every ten seconds, so Loki has something in it before the first
+request is ever made — and that line carries no tenant, because a scheduled task has none.
+
+To export somewhere other than the local stack, drop the profile and point the standard OpenTelemetry
+variable at a collector; the three exporters follow it:
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT=http://collector.internal:4318 mvn spring-boot:run
 ```
 
 ### Browsing the documentation

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Spring Boot configures an SdkLoggerProvider and an OTLP log exporter, but nothing hands Logback
+  events to it. This file is the missing half: the same lines that reach the console also reach the
+  collector, already carrying the trace and span they belong to, because the appender reads the
+  OpenTelemetry context the tracer put there.
+
+  Declaring a Logback file replaces Boot's default setup, so `defaults.xml` and `console-appender.xml`
+  are included back to keep the familiar console format — including the `[traceId-spanId]`
+  correlation field, which Boot fills in only once tracing is on the classpath.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
+        <!-- The tenant that TenantObservabilityFilter puts in the MDC, so Loki can filter by owner. -->
+        <captureMdcAttributes>tenant</captureMdcAttributes>
+        <captureCodeAttributes>true</captureCodeAttributes>
+        <!--
+          Events logged before the OpenTelemetry bean exists are buffered and replayed on install,
+          which is the whole of startup. The default of 1000 truncates it.
+        -->
+        <numLogsCapturedBeforeOtelInstall>4096</numLogsCapturedBeforeOtelInstall>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="OTEL"/>
+    </root>
+</configuration>

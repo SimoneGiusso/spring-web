@@ -83,3 +83,20 @@ services:
             }
           ]
         }
+
+  lgtm:
+    image: grafana/otel-lgtm:0.32.1
+    labels:
+      org.springframework.boot.ignore: "true" # Explicitly configures connection with application properties and not via pring-boot-docker-compose
+    ports:
+      - "3000:3000"   # Grafana
+      - "4318:4318"   # OTLP/HTTP — the endpoint application-local.yml points at
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true" # allow unauthenticated access
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin # give those visitors Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true" # hide the login form entirely
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://localhost:3000/api/health || exit 1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
