@@ -6,15 +6,15 @@
   "exp": 1788598799,
   "aio": "E2ZgYPjBv8Rk6bSVn1mM7oyLZ9dHAA==",
   "azp": "b41d9e6f-0a83-4c25-91d7-5e8a4f60b3c2",
-  "azpacr": "1",
-  "idtyp": "app",
+  "azpacr": "0",
   "oid": "3f9b2e10-7c4d-4a1b-9e8f-2d5c6b7a8e90",
   "rh": "0.AR8A2sK1qP3mF0eZbT1xUvQ9c0Zg1nAaBcdEfGhIjKlMnOpQrSt.",
   "roles": [
     "Catalog.ReadWrite"
   ],
-  "sub": "3f9b2e10-7c4d-4a1b-9e8f-2d5c6b7a8e90",
+  "sub": "synthetic-pairwise-user-subject",
   "tid": "6c1e0b7a-2d3f-4a5b-8c9d-0e1f2a3b4c5d",
   "uti": "5xQ0aL3nEkm7Rb9YtCvPAA",
-  "ver": "2.0"
+  "ver": "2.0",
+  "scp": "access_as_user"
 }

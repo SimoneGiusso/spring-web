@@ -8,6 +8,9 @@ import static org.springframework.test.json.JsonCompareMode.STRICT;
 
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.simonegiusso.springweb.config.security.Permission;
 import org.simonegiusso.springweb.config.security.Roles;
 import org.simonegiusso.springweb.support.MockEntra;
@@ -31,6 +34,25 @@ class TokenValidationIT extends BaseProductApiIT {
         testData.insertAnEspressoMachineOwnedBy(ALICE);
 
         clientFor(ALICE, Permission.READ).get()
+            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
+            .expectStatus().isOk()
+            .expectBody().json(assertionFile("stored-product.json"), STRICT);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"other_scope", "access_as_user_extra"})
+    void givenMissingRequiredScope_whenGet_thenForbidAccess(String scopes) {
+        clientBearing(MockEntra.tokenWithScopes(ALICE, scopes, Permission.READ)).get()
+            .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
+            .expectStatus().isForbidden()
+            .expectBody().json(assertionFile("missing-scope-response.json", ESPRESSO_MACHINE_ID), STRICT);
+    }
+
+    @Test
+    void givenRequiredScopeAmongOtherScopes_whenGet_thenAcceptIt() {
+        testData.insertAnEspressoMachineOwnedBy(ALICE);
+        clientBearing(MockEntra.tokenWithScopes(ALICE, "other access_as_user another", Permission.READ)).get()
             .uri(BASE_PATH + "/{id}", ESPRESSO_MACHINE_ID).exchange()
             .expectStatus().isOk()
             .expectBody().json(assertionFile("stored-product.json"), STRICT);

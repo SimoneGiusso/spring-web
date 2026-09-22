@@ -7,35 +7,34 @@ import org.simonegiusso.springweb.support.MockEntra;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Guards the assumptions behind the token configuration against a token actually observed from the
- * tenant, captured by {@code scripts/capture-entra-token.sh}. Without it the suite would only
- * confirm that the mock agrees with whatever the configuration already assumed.
+ * Checks the documented delegated-token shape against the synthetic fixture.
+ * A development-tenant token can be decoded with {@code scripts/capture-entra-token.sh}.
  */
 class EntraTokenFixtureTest {
 
     private final JsonNode decodedToken = MockEntra.decodedToken();
 
     @Test
-    void theObservedTokenIsAV2TokenSoItsAudienceIsTheBareClientId() {
+    void theFixtureUsesAV2TokenWithTheBareClientIdAudience() {
         assertThat(decodedToken.get("iss").asString()).endsWith("/v2.0");
         assertThat(decodedToken.get("ver").asString()).isEqualTo("2.0");
         assertThat(decodedToken.get("aud").asString()).doesNotStartWith("api://");
     }
 
     @Test
-    void theSuiteMintsTokensForTheAudienceThatWasObserved() {
+    void theSuiteMintsTokensForTheFixtureAudience() {
         assertThat(MockEntra.audience()).isEqualTo(decodedToken.get("aud").asString());
     }
 
     @Test
-    void theObservedTokenWasIssuedToAnApplicationRatherThanAUser() {
-        assertThat(decodedToken.get("sub").asString()).isEqualTo(decodedToken.get("oid").asString());
+    void theTokenRepresentsAUser() {
+        assertThat(decodedToken.get("sub").asString()).isNotEqualTo(decodedToken.get("oid").asString());
         assertThat(decodedToken.get("iss").asString()).contains(decodedToken.get("tid").asString());
     }
 
     @Test
-    void theObservedTokenCarriesRolesRatherThanScopes() {
+    void theTokenCarriesBothRolesAndTheDelegatedScope() {
         assertThat(decodedToken.has("roles")).isTrue();
-        assertThat(decodedToken.has("scp")).isFalse();
+        assertThat(decodedToken.get("scp").asString()).isEqualTo("access_as_user");
     }
 }

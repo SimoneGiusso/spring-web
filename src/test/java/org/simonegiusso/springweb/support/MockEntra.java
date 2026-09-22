@@ -6,6 +6,7 @@ import com.nimbusds.jwt.SignedJWT;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import no.nav.security.mock.oauth2.MockOAuth2Server;
@@ -42,6 +43,11 @@ public enum MockEntra {
     static void registerIssuer(DynamicPropertyRegistry registry) {
         registry.add("spring.security.oauth2.resourceserver.jwt.issuer-uri", () -> O_AUTH_2_SERVER.issuerUrl(ISSUER_ID).toString());
         registry.add("spring.security.oauth2.resourceserver.jwt.audiences", () -> AUDIENCE);
+        registry.add("catalog.security.required-scope", () -> "access_as_user");
+        registry.add("catalog.security.scope", () -> "api://" + AUDIENCE + "/access_as_user");
+        registry.add("catalog.security.authorization-url", () -> O_AUTH_2_SERVER.issuerUrl(ISSUER_ID) + "/authorize");
+        registry.add("catalog.security.token-url", () -> O_AUTH_2_SERVER.issuerUrl(ISSUER_ID) + "/token");
+        registry.add("springdoc.swagger-ui.oauth.client-id", () -> "swagger-test");
     }
 
     public static String audience() {
@@ -72,7 +78,20 @@ public enum MockEntra {
     }
 
     private static String token(String objectId, String audience, long expirySeconds, Permission... permissions) {
+        return tokenWithScopes(objectId, audience, expirySeconds, "access_as_user", permissions);
+    }
+
+    public static String tokenWithScopes(String objectId, String scopes, Permission... permissions) {
+        return tokenWithScopes(objectId, AUDIENCE, 3600, scopes, permissions);
+    }
+
+    private static String tokenWithScopes(String objectId, String audience, long expirySeconds,
+        String scopes, Permission... permissions) {
         List<String> roles = Arrays.stream(permissions).map(Permission::role).toList();
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("oid", objectId);
+        claims.put("roles", roles);
+        claims.put("scp", scopes);
         SignedJWT jwt = O_AUTH_2_SERVER.issueToken(
             ISSUER_ID,
             objectId,
@@ -81,7 +100,7 @@ public enum MockEntra {
                 objectId,
                 "JWT",
                 List.of(audience),
-                Map.of("oid", objectId, "roles", roles, "idtyp", "app"),
+                claims,
                 expirySeconds));
         return jwt.serialize();
     }

@@ -13,9 +13,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Stands in for Entra ID so the application can be run without a tenant. It is a real OIDC
-  # issuer — discovery, JWKS, signatures — issuing tokens shaped like Entra's: the client id
-  # becomes the `oid`, and so the tenant. Ask for client_id=auditor to get Catalog.Read.All.
+  # Interactive local issuer: log in as alice, bob, reader or auditor.
   mock-entra:
     image: ghcr.io/navikt/mock-oauth2-server:6.0.2
     ports:
@@ -23,57 +21,58 @@ services:
     environment:
       JSON_CONFIG: >
         {
+          "interactiveLogin": true,
           "tokenCallbacks": [
             {
               "issuerId": "entra",
               "requestMappings": [
                 {
-                  "requestParam": "client_id",
+                  "requestParam": "subject",
                   "match": "alice",
                   "claims": {
                     "aud": "catalog-api",
                     "sub": "alice",
                     "oid": "alice",
-                    "idtyp": "app",
+                    "scp": "access_as_user",
                     "roles": [
                       "Catalog.ReadWrite"
                     ]
                   }
                 },
                 {
-                  "requestParam": "client_id",
+                  "requestParam": "subject",
                   "match": "bob",
                   "claims": {
                     "aud": "catalog-api",
                     "sub": "bob",
                     "oid": "bob",
-                    "idtyp": "app",
+                    "scp": "access_as_user",
                     "roles": [
                       "Catalog.ReadWrite"
                     ]
                   }
                 },
                 {
-                  "requestParam": "client_id",
+                  "requestParam": "subject",
                   "match": "reader",
                   "claims": {
                     "aud": "catalog-api",
                     "sub": "reader",
                     "oid": "reader",
-                    "idtyp": "app",
+                    "scp": "access_as_user",
                     "roles": [
                       "Catalog.Read"
                     ]
                   }
                 },
                 {
-                  "requestParam": "client_id",
+                  "requestParam": "subject",
                   "match": "auditor",
                   "claims": {
                     "aud": "catalog-api",
                     "sub": "auditor",
                     "oid": "auditor",
-                    "idtyp": "app",
+                    "scp": "access_as_user",
                     "roles": [
                       "Catalog.Read.All"
                     ]

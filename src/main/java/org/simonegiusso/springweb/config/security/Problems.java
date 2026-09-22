@@ -23,7 +23,7 @@ public enum Problems {
      */
     public static ProblemDetail insufficientPermission() {
         return of(FORBIDDEN, type("insufficient-permission"), "Insufficient permission",
-            "The token does not carry a role that permits this operation.");
+            "The token does not carry the scope or role required for this operation.");
     }
 
     public static ProblemDetail of(HttpStatus status, URI type, String title, String detail) {

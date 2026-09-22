@@ -3,5 +3,5 @@
   "title": "Insufficient permission",
   "status": 403,
   "detail": "The token does not carry the scope or role required for this operation.",
-  "instance": "${basePath}"
+  "instance": "${basePath}/${id}"
 }

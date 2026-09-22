@@ -14,7 +14,7 @@ import org.springframework.web.context.annotation.RequestScope;
 
 /**
  * The caller of the current request, taken from the validated token: {@code oid} identifies the
- * service principal and becomes the tenant, {@code roles} become its permissions.
+ * user and becomes the tenant, {@code roles} become its permissions.
  */
 @Component
 @RequestScope

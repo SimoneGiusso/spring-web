@@ -6,7 +6,7 @@ against real infrastructure.
 
 - **Authentication and authorisation:** an OAuth2 resource server validates Microsoft Entra ID JWT
   bearer tokens and enforces read, write and cross-tenant read permissions through app roles.
-- **Tenant isolation:** products belong to the calling service principal; Hibernate enforces
+- **Tenant isolation:** products belong to the signed-in user; Hibernate enforces
   ownership when reading and writing data.
 - **JSON endpoints and CSV uploads:** create, retrieve and partially update products, or import a
   CSV file through `POST /api/products/import`. Imports validate every row and roll back the entire
@@ -45,9 +45,13 @@ against real infrastructure.
 
 ### Authentication
 
-OAuth2 resource server against **Microsoft Entra ID**. Callers are service principals using the
-client-credentials flow — no humans, no browser, no sessions — so every request carries its own
-`Authorization: Bearer <jwt>` and the chain is stateless with CSRF disabled.
+Swagger UI signs users into **Microsoft Entra ID** using authorization code with PKCE.
+The API remains a stateless OAuth2 resource server: Swagger sends an access token in
+`Authorization: Bearer <jwt>` on each request. The API itself does not create a login session.
+
+Every protected request requires `access_as_user` in the space-separated `scp` claim.
+Set `ENTRA_REQUIRED_SCOPE` to change that required scope. App-only tokens lack this delegated
+scope and are denied. Existing endpoint permissions still come exclusively from `roles`.
 
 The decoder and the whole claim mapping are auto-configured from properties; no
 `JwtAuthenticationConverter` bean is declared:
@@ -61,7 +65,7 @@ spring.security.oauth2.resourceserver.jwt:
   principal-claim-name: oid
 ```
 
-Two claims carry everything: **`oid`**, the service principal's object id, becomes the principal and
+Identity and permissions: **`oid`**, the user's object id, becomes the principal and
 goes straight into the `@TenantId` column with no mapping table; **`roles`** become authorities and
 are checked by `@PreAuthorize`. `authority-prefix: ""` is load-bearing — remove it and every role
 silently becomes `SCOPE_`-prefixed and every request 403s, which a test pins.
@@ -74,8 +78,9 @@ Spring Security raises 401 and 403 inside the filter chain, before Spring MVC, w
 
 ### The token
 
-A decoded v2.0 app-only access token. `src/test/resources/entra/decoded-token.json` holds one and
-the suite mints its tokens to match it, so the fixture is what the configuration is checked against:
+Swagger sends the API a **delegated access token** after the user signs in. Here is its decoded
+payload, using the synthetic values from [the test fixture](src/test/resources/entra/decoded-token.json).
+This is an illustrative expired example, not a usable token or real user data.
 
 ```json
 {
@@ -86,41 +91,45 @@ the suite mints its tokens to match it, so the fixture is what the configuration
   "exp": 1788598799,
   "aio": "E2ZgYPjBv8Rk6bSVn1mM7oyLZ9dHAA==",
   "azp": "b41d9e6f-0a83-4c25-91d7-5e8a4f60b3c2",
-  "azpacr": "1",
-  "idtyp": "app",
+  "azpacr": "0",
   "oid": "3f9b2e10-7c4d-4a1b-9e8f-2d5c6b7a8e90",
   "rh": "0.AR8A2sK1qP3mF0eZbT1xUvQ9c0Zg1nAaBcdEfGhIjKlMnOpQrSt.",
   "roles": [
     "Catalog.ReadWrite"
   ],
-  "sub": "3f9b2e10-7c4d-4a1b-9e8f-2d5c6b7a8e90",
+  "sub": "synthetic-pairwise-user-subject",
   "tid": "6c1e0b7a-2d3f-4a5b-8c9d-0e1f2a3b4c5d",
   "uti": "5xQ0aL3nEkm7Rb9YtCvPAA",
-  "ver": "2.0"
+  "ver": "2.0",
+  "scp": "access_as_user"
 }
 ```
 
 | Claim | Meaning | Role here |
 |---|---|---|
-| `aud` | Who the token is for. In **v2.0 always the bare client id** of the API — a v1.0 token would carry `api://<guid>` instead, and configuring the wrong one is the classic mistake this fixture exists to catch. | validated |
+| `aud` | Who the token is for. In **v2.0 always the bare client id** of the API — a v1.0 token can carry `api://<guid>` instead, and configuring the wrong one is the classic mistake this fixture exists to catch. | validated |
 | `iss` | The issuing authority, ending in `/v2.0` for v2 tokens. Its GUID is the tenant. | validated |
-| `exp` · `nbf` · `iat` | Expiry, not-before and issue time, as Unix timestamps. | validated |
-| `oid` | Immutable object id of the caller's **service principal** in this tenant. Stable across applications, so it is the identity worth keying data on. | **the tenant** — goes straight into `products.owner` |
-| `roles` | App roles the caller was granted. The client-credentials flow uses these *in place of* `scp`, which appears only in user tokens. | **the authorities** `@PreAuthorize` checks |
-| `sub` | Subject. Pairwise and unique per application; for an app-only token it equals `oid`. | — |
-| `azp` | Application id of the *calling* app registration. Distinct from `oid`, which is that app's service principal object id. | — |
+| `exp` · `nbf` · `iat` | Expiry, not-before and issue time, as Unix timestamps. | `exp` and `nbf` validated |
+| `oid` | Immutable object id of the **user** in this tenant. Stable across applications, so it is the identity worth keying data on. | **the owner** — goes straight into `products.owner` |
+| `scp` | Delegated scopes granted to the client on behalf of the user, as a space-separated string. | must include `access_as_user` |
+| `roles` | App roles the caller was granted. In user tokens these appear alongside `scp`, which grants delegated access. | **the authorities** `@PreAuthorize` checks |
+| `sub` | Subject. Pairwise and unique per application. | — |
+| `azp` | Application id of the *calling* app registration. Distinct from `oid`, which is the user's object id. | — |
 | `azpacr` | How the client authenticated: `0` public client, `1` client secret, `2` certificate. | — |
 | `tid` | Tenant the token was issued in; matches the GUID in `iss`. | — |
-| `idtyp` | `app` for app-only tokens. An **optional claim** — it must be enabled on the app registration to appear at all. | — |
 | `ver` | Token version, `2.0`. | — |
 | `uti` | Per-token identifier, the Entra equivalent of `jti`. Useful in sign-in logs. | — |
 | `aio` · `rh` | Opaque, internal to Entra. Microsoft documents these as not for resource consumption. | ignored |
 
-Only `aud`, `iss`, the timestamps, `oid` and `roles` matter to this application; everything else is
-context Entra includes. Spring validates the first three, and the claim mapping turns the last two
-into the principal and its authorities.
+Claim definitions: [Microsoft's access-token claims reference](https://learn.microsoft.com/en-us/entra/identity-platform/access-token-claims-reference).
 
-### Authorisation
+For this example, the API first validates the signature, issuer, audience and validity period.
+It then requires `access_as_user` in `scp`. The `Catalog.ReadWrite` role permits reading and
+modifying products, while `oid` restricts those operations to this user's products. Having the
+scope alone does not grant an endpoint role, and having a role without the scope does not permit
+delegated access.
+
+### Authorization
 
 Entra app roles:
 
@@ -311,12 +320,6 @@ what a test needs, so nothing inherits what it does not use:
   real `JwtDecoder` — real JWKS, real signatures, real audience and expiry validation. Every test
   goes through it rather than injecting an `Authentication`: the base classes drive real HTTP, where
   the `jwt()` post-processor (MockMvc only) does not apply, and one mechanism beats two.
-- **`entra/decoded-token.json`** holds the decoded payload of a token captured from the tenant by
-  `scripts/capture-entra-token.sh`. The suite mints tokens for *its* audience, and
-  `EntraTokenFixtureTest` asserts the token really is v2 — bare-GUID `aud`, `roles` not `scp`,
-  `sub` equal to `oid`. Without it the mock would only ever agree with whatever the configuration
-  already assumed. **The committed file is synthetic**: it has the shape and claim set of a real
-  token but none of its values came from a tenant, so run the capture script before trusting it.
 - **`LgtmStackContainer`** starts the same image the local stack uses, and `ObservabilityIT` asks
   Tempo, Prometheus and Loki whether the request it just made arrived. A telemetry pipeline is only
   worth asserting from the far end: the exporters are never inspected, the backends are queried in
@@ -377,35 +380,16 @@ discovery, JWKS and signatures, issuing Entra-shaped tokens. Security is not dis
 the same filter chain runs, against the same decoder, and an unauthenticated request still gets
 `401`. Only the issuer is local.
 
-Four callers are configured, one per interesting role. The client id becomes the `oid`, and so the
-tenant:
+Four local users are configured. The login username supplies the mock `oid`, and so the owner:
 
-| `client_id` | Roles | |
+| Username | Roles | |
 |---|---|---|
 | `alice`, `bob` | `Catalog.ReadWrite` | two tenants, each blind to the other |
 | `reader` | `Catalog.Read` | reads its own; a write is `403` |
 | `auditor` | `Catalog.Read.All` | reads every owner; a write is `403` |
 
-```bash
-TOKEN=$(curl -s -X POST http://localhost:8081/entra/token \
-  -d grant_type=client_credentials -d client_id=alice -d client_secret=secret \
-  | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])')
-
-curl localhost:8080/api/products -H "Authorization: Bearer $TOKEN" \
-  -H 'Content-Type: application/json' \
-  -d '{"sku":"SKU-000001","name":"Widget","price":10.00,"stockQuantity":5,"category":"HOME"}'
-```
-
-Against a real tenant instead, set `ENTRA_TENANT_ID` and `ENTRA_API_CLIENT_ID` and drop the profile
-(`mvn spring-boot:run -Dspring-boot.run.profiles=`), having exposed `Catalog.Read`,
-`Catalog.ReadWrite` and `Catalog.Read.All` as app roles on the registration. The test suite needs
-neither — it runs its own issuer in-process.
-
-```bash
-curl localhost:8080/api/products/{id} -H "Authorization: Bearer $TOKEN"   # 200 if it is yours
-curl localhost:8080/api/products/{id} -H "Authorization: Bearer $BOBS"    # 404 — never 403
-curl localhost:8080/api/products/{id}                                     # 401 problem document
-```
+Open <http://localhost:8080/swagger-ui.html> and click **Authorize**. The local mock login accepts
+`alice`, `bob`, `reader`, or `auditor` as usernames and supplies the corresponding catalog roles.
 
 ### Watching it run
 

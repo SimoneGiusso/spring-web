@@ -57,3 +57,19 @@ management:
 logging:
   level:
     org.simonegiusso.springweb: INFO
+
+catalog:
+  security:
+    required-scope: ${ENTRA_REQUIRED_SCOPE:access_as_user}
+    scope: ${ENTRA_SCOPE:api://${ENTRA_API_CLIENT_ID}/${catalog.security.required-scope}}
+    authorization-url: https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/authorize
+    token-url: https://login.microsoftonline.com/${ENTRA_TENANT_ID}/oauth2/v2.0/token
+
+springdoc:
+  swagger-ui:
+    oauth:
+      client-id: ${ENTRA_SWAGGER_CLIENT_ID}
+      use-pkce-with-authorization-code-grant: true
+      scopes:
+        - openid
+        - ${catalog.security.scope}
